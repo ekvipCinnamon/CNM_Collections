@@ -1,0 +1,95 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="TreeTestClass" Id="{629d4bd4-e8a9-4047-8c82-53b4b2bf220d}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK TreeTestClass EXTENDS CNM_Collections.BalancedBinarySearchTree
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="FB_init" Id="{e8c9b5f1-e27c-4998-911c-8684405a3bac}">
+      <Declaration><![CDATA[(*
+
+short summary
+=================
+The constructor ``FB_init`` is needed to create an unique hash code.
+The hash code is a pseudo random number create with a xorshift_ algorithm.
+It can be overwritten on derivations, because it will be called implicit, ``SUPER^.FB_init()`` is not required.
+For more information check: `Behavoir with derived function blocks`_
+
+.. _Behavoir with derived function blocks: https://infosys.beckhoff.com/content/1033/tc3_plc_intro/5482088715.html?id=6983869892358031022
+
+.. _xorshift: https://en.wikipedia.org/wiki/Xorshift
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+parameters
+=================
+
+*)
+
+METHOD FB_init : BOOL
+VAR_INPUT
+	(* if TRUE, the retain variables are initialized (warm start / cold start)*)
+	bInitRetains	:BOOL;
+	(* if TRUE, the instance afterwards gets moved into the copy code (online change) *)
+	bInCopyCode		:BOOL;  
+	(*Optional comparator*)
+	nodeComparator 	:CNM_AbstractObject.IComparator	:= OBJECT_NOT_REFERENCED;
+END_VAR
+VAR
+	{attribute 'hide'}
+	newHashstate3		:CNM_AbstractObject.Hashcode;
+END_VAR
+VAR CONSTANT
+	{attribute 'hide'}
+	NUMBER_OF_LEFT_SHIFTS		:UINT	:= 17;
+	{attribute 'hide'}
+	NUMBER_OF_LEFT_ROTATIONS	:UINT   := 45;
+	OBJECT_NOT_REFERENCED 		:__XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.collectionSize := 0;
+THIS^.nodeComparator := nodeComparator;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="testRootNode" Id="{1458e62c-b3c6-41a1-ac60-e0a4c8a1d86c}">
+      <Declaration><![CDATA[PROPERTY PUBLIC testRootNode : CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode]]></Declaration>
+      <Get Name="Get" Id="{28248cad-5a03-43fe-ae9d-d81653319723}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[testRootNode := THIS^.rootNode;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="TreeTestClass">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="TreeTestClass.FB_init">
+      <LineId Id="47" Count="0" />
+      <LineId Id="142" Count="0" />
+      <LineId Id="192" Count="0" />
+    </LineIds>
+    <LineIds Name="TreeTestClass.testRootNode.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

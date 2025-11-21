@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <Itf Name="IBBSTIterator" Id="{c016a998-c317-49fe-be4d-6f07254eef0c}">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This interface extends the IIterator interface for collections by the method attachTree().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+INTERFACE IBBSTIterator EXTENDS CNM_CollectionInterfaces.IIterator
+
+]]></Declaration>
+    <Method Name="attachTree" Id="{efc17297-f4f6-47be-af72-986e7beacb93}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method attaches an binary balances search tree to the iterator.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+*)
+
+METHOD attachTree 
+VAR_INPUT
+	(* The tree to be attached, should not be NULL *)
+	tree : REFERENCE TO BalancedBinarySearchTree;
+END_VAR
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

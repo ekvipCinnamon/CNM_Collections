@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ArrayOfProfilerDescription xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ProfilerDescription Id="12390982460379852467" QualifiedName="TestLinkedList" Offset="0" />
+  <ProfilerDescription Id="7512457746911264043" QualifiedName="LinkedListTest" Offset="0" />
+  <ProfilerDescription Id="1409486309846984187" QualifiedName="LinkedListTest.SortAndCheckPreviousElement" Offset="0" />
+  <ProfilerDescription Id="1085428253095490229" QualifiedName="TestArrayList" Offset="0" />
+  <ProfilerDescription Id="7737454832303834959" QualifiedName="ContainerBasedArrayListSorterTest" Offset="0" />
+  <ProfilerDescription Id="402165913570954771" QualifiedName="ContainerBasedArrayListSorterTest.sortAndRescale" Offset="0" />
+  <ProfilerDescription Id="8345734458391549346" QualifiedName="TreeTestClass" Offset="0" />
+  <ProfilerDescription Id="9609094362914769231" QualifiedName="concretBBSTreeTest" Offset="0" />
+  <ProfilerDescription Id="9051556231474987610" QualifiedName="concretBBSTreeTest.insertElementInEmptyTree" Offset="0" />
+  <ProfilerDescription Id="5200328644440458717" QualifiedName="concretBBSTreeTest.nodesAreInCorrectOrderWithReverseOrderComparator" Offset="0" />
+  <ProfilerDescription Id="17471692173126314629" QualifiedName="concretBBSTreeTest.insertElementsToCheckRotation" Offset="0" />
+  <ProfilerDescription Id="11137262430590473752" QualifiedName="concretBBSTreeTest.generateTestmessage" Offset="0" />
+  <ProfilerDescription Id="13468297440869059339" QualifiedName="concretBBSTreeTest.removeElements" Offset="0" />
+  <ProfilerDescription Id="3729766889619289942" QualifiedName="concretBBSTreeTest.checkNodeReverseOrder" Offset="0" />
+  <ProfilerDescription Id="7625923668379592734" QualifiedName="MAIN" Offset="0" />
+</ArrayOfProfilerDescription>

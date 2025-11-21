@@ -1,0 +1,599 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="LinkedListMergeSorter" Id="{7bf2e807-0236-4116-a25e-0ff5d1da63a0}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Implementation of an Inplace Mergesorter for the LinkedList
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK LinkedListMergeSorter EXTENDS AbstractLinkedListSorter
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="Protected" Id="{fc691ea5-e33a-41d4-80cd-f8f6aeeea2b2}" />
+    <Property Name="className" Id="{8dba545b-2f2b-4ba7-b343-dc0649c3745c}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{f4be9d0e-29b4-48bc-a655-75779adaeb21}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.LinkedListMergeSorter';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clone" Id="{31015ed8-01f4-475f-ae74-2efc9e9ab4e2}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are not cloned for this there is the method `ICloneable.deepClone`.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support cloning
+
+*)
+METHOD clone : CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR
+	newSorter :POINTER TO LinkedListMergeSorter;
+END_VAR
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject	: CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[newSorter := __NEW(
+	LinkedListMergeSorter()
+);
+
+IF (newSorter = 0) THEN
+	clone := CNM_ReturnTypes.CloneResult.FAILED;
+ELSE
+	clone := CNM_ReturnTypes.CloneResult.SUCCESS;
+	THIS^.prepareClonedSorter(newSorter^);
+	clonedObject := newSorter^;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantSort" Id="{c9f89f4f-af5a-43c3-9d66-f54fc6963599}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure instantly within one call. 
+Uses the passed Comparator or the compareTo of the contained Objects if no comparator is passed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``ERROR``: Sort was not able to finish 
+	``SUCCESS``: Sorting was finished succesfully
+
+*)
+METHOD instantSort : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The size of the list to be sorted*)
+	size	: UDINT;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*The first element in the list, must be set on every call to current head of list.*)
+	head	: CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*The last element of the list after sorting, may be useful for doublelinked structures*)
+	last	: CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion	: __XWORD;
+END_VAR
+VAR
+	mergesThisRun 		:__XWORD;
+	mergeSize			:__XWORD;
+	mergeSizeLeft		:__XWORD;
+	mergeSizeRight		:__XWORD;
+	index				:__XWORD;
+	leftElementToMerge	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	rightElementToMerge	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	sortComplete :BOOL := FALSE;
+	comparesThisCycle	:__XWORD := 0;
+END_VAR
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED 	:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.sorterHead := head;
+THIS^.sorterLast := OBJECT_NOT_REFERENCED;
+THIS^.setComparator(comparator);
+mergeSize := 1;
+WHILE NOT sortComplete DO
+	IF THIS^.isObjectNull(leftElementToMerge) THEN 
+		mergesThisRun := 0;	
+		leftElementToMerge := THIS^.sorterHead;	
+		THIS^.sorterHead := OBJECT_NOT_REFERENCED;
+		THIS^.sorterLast := OBJECT_NOT_REFERENCED;		
+	END_IF;
+		
+	//one run trought the list from left to right
+	WHILE THIS^.isObjectValid(leftElementToMerge) DO
+		mergesThisRun := mergesThisRun + 1;
+		rightElementToMerge := leftElementToMerge;
+		//place rightElement mergeSize steps right of leftElement
+		mergeSizeLeft := 0;	
+		FOR index := 0 TO mergeSize-1 DO
+			mergeSizeLeft := mergeSizeLeft + 1;
+			rightElementToMerge := rightElementToMerge.next;
+			IF THIS^.isObjectNull(rightElementToMerge) THEN
+				EXIT;
+			END_IF
+		END_FOR
+		mergeSizeRight := mergeSize;
+		
+		THIS^.merge(	
+			leftElement := leftElementToMerge,
+			rightElement := rightElementToMerge,
+			mergeSizeLeft := mergeSizeLeft,
+			mergeSizeRight := mergeSizeRight,
+			mergeHead := THIS^.sorterHead,
+			mergeLast := THIS^.sorterLast,
+			comparesThisCycle := comparesThisCycle
+		);
+		
+		//set leftElementToMerge to first unmerged Element, as rightElementToMerge points to the Element behind the right Mergesection
+		leftElementToMerge := rightElementToMerge;
+	END_WHILE
+	
+	IF (mergesThisRun <= 1) AND THIS^.isObjectNull(leftElementToMerge) THEN
+		sortComplete := TRUE;
+	ELSIF THIS^.isObjectNull(leftElementToMerge) THEN
+		mergeSize := mergeSize * 2;
+	END_IF;
+	
+	head := THIS^.sorterHead;
+	last := THIS^.sorterLast;
+
+END_WHILE
+
+currentListVersion := currentListVersion + 1;
+instantSort := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="merge" Id="{ec33274e-a509-444d-a02a-3568212026c6}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Does an inplace ordered Merge of two list sections, that are defined by their first object and the length of the section.
+Merge is achived by updating the links of the elements.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** CNM_ReturnTypes.ExecutionState: the state of the merge, 
+	SUCCESS if list is merged from left to right bound, 
+	BUSY if list not completly merged, needs to be called again.
+
+*)
+
+METHOD PROTECTED merge
+VAR_INPUT
+	//how many elements are in the left section
+	mergeSizeLeft 	:__XWORD;
+	//how many elements are in the right section
+	mergeSizeRight	:__XWORD;
+END_VAR
+VAR_IN_OUT
+	//The updated head of the list that is beeing merged
+	mergeHead			:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	//The updated last of the list that is beeing merged
+	mergeLast			:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	//the first element of the left section
+	leftElement			:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	// the first element of the right section
+	rightElement		:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	//The amount of already performed compares this cycle
+	comparesThisCycle :__XWORD;
+END_VAR
+VAR
+	remainElementsLeft	:__XWORD := mergeSizeLeft;
+	remainElementsRight	:__XWORD := mergeSizeRight;
+	elementToMerge		:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	lastLeftElement	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED :__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectValid(rightElement) THEN
+	lastLeftElement := rightElement.previous;	
+END_IF
+
+//when remainElementsRight is greater 0, also check if currentRightElement is valid, may not be valid for the merge at end of the list
+WHILE(remainElementsLeft > 0 AND_THEN remainElementsRight > 0 AND_THEN THIS^.isObjectValid(rightElement) ) DO
+	//by comparing that way, when elements are equal, they are taken from left, making the sort Stable 
+	IF THIS^.compareElements(rightElement.object,leftElement.object) = CNM_ReturnTypes.ComparationResult.SMALLER THEN
+		elementToMerge := rightElement;
+		rightElement := rightElement.next;
+		remainElementsRight := remainElementsRight - 1;
+	ELSE
+		elementToMerge := leftElement;
+		leftElement := leftElement.next;
+		remainElementsLeft := remainElementsLeft - 1;
+	END_IF;
+	
+	IF THIS^.isObjectNull(mergeHead) THEN
+		mergeHead := elementToMerge;
+	ELSE
+		mergeLast.next := elementToMerge;
+	END_IF;
+	
+	elementToMerge.previous := mergeLast;	
+	mergeLast := elementToMerge;
+	comparesThisCycle := comparesThisCycle+1;
+END_WHILE
+
+elementToMerge := SEL(
+	remainElementsLeft > 0,
+	rightElement,
+	leftElement
+);
+moveRemainingElements(
+	remainingElements := SEL(
+		remainElementsLeft > 0,
+		remainElementsRight,
+		remainElementsLeft
+	),
+	elementToMerge := elementToMerge,
+	mergeHead := mergeHead,
+	mergeLast := mergeLast,
+	lastRemainder := SEL(remainElementsLeft>0,OBJECT_NOT_REFERENCED,lastLeftElement),
+	operationsCount := comparesThisCycle
+);	
+
+IF remainElementsRight > 0 AND_THEN THIS^.isObjectValid(rightElement) THEN
+	rightElement := mergeLast.next;
+ELSE
+	mergeLast.next := rightElement;
+END_IF
+
+IF THIS^.isObjectValid(rightElement) THEN
+	rightElement.previous := mergeLast;	
+END_IF	
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="moveRemainingElements" Id="{fa3bb898-789e-4107-a0dd-df88fcb55ec6}" FolderPath="Protected\">
+      <Declaration><![CDATA[METHOD moveRemainingElements : BOOL
+VAR_INPUT
+	remainingElements :__XWORD;
+	lastRemainder	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+VAR_IN_OUT
+	elementToMerge	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	mergeHead		:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	mergeLast		:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	
+	operationsCount	:__XWORD;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//one side is empty, other needs to be "copied"
+IF THIS^.isObjectNull(mergeHead) THEN
+	mergeHead := elementToMerge;
+ELSE
+	mergeLast.next := elementToMerge;
+END_IF;
+
+elementToMerge.previous := mergeLast;	
+
+IF THIS^.isObjectValid(lastRemainder) THEN
+	// first and last of the remaining elements are know, so just move the whole section
+	mergeLast := lastRemainder;
+	operationsCount := operationsCount + 1;
+ELSE
+	//step over the leftover elements to figure out the last element of that section
+	WHILE remainingElements > 0 AND_THEN THIS^.isObjectValid(elementToMerge) DO
+		mergeLast := elementToMerge;	
+		elementToMerge := elementToMerge.next;
+		remainingElements := remainingElements - 1;
+		operationsCount := operationsCount +1;
+	END_WHILE
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="sort" Id="{9f550189-0faf-4373-9f47-fcdba86e550a}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure. 
+It uses the passed Comperator to sort the structure.
+This can take many cycles and should be called until the CNM_ReturnTypes.ExecutionState is no longer ``BUSY``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``ABORTED``: While sort was pending,execute had a falling edge,
+	``BUSY``: Sort is in progress
+	``ERROR``: Sort was not able to finish (p.e. List changed) call sort(false) to reset
+	``IDLE``: Currently no sort in progress
+	``SUCCESS``: Sorting was finished 
+
+*)
+METHOD sort : CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*control bit to start or abort the sorting, needs to be active until the ExecutionState is SUCCESS*)
+	execute	: BOOL;
+	(*The size of the list to be sorted*)
+	size :UDINT;
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_AbstractObject.IComparator	:= 0;
+END_VAR
+VAR_IN_OUT
+	(*The first element in the list, must be set on every call to current head of list.*)
+	head :CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*The last element of the list after sorting, may be useful for doublelinked structures*)
+	last :CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion :__XWORD;
+END_VAR
+VAR_INST
+	cycleManager 		:CNM_CycleManager.SimpleCycleManager;
+	leftElementToMerge	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	rightElementToMerge	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*How many merges were made during traversing list from left to right*)
+	mergesThisRun 		:__XWORD;
+	mergeSize			:__XWORD;
+	mergeSizeLeft		:__XWORD;
+	mergeSizeRight		:__XWORD;
+	index				:__XWORD;
+	(* list version index, used to detect list changes during sorting *)
+	lastListChangeIndex :__XWORD;
+END_VAR
+VAR
+	comparesThisCycle	:__XWORD	:= 0;
+END_VAR
+VAR CONSTANT
+	INIT	:DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT; 
+	SUCCESS :DINT := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS;
+	ERROR   :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+	RUN_SORT :DINT := INIT + 1;
+	OBJECT_NOT_REFERENCED 	:__XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[cycleManager(execute := execute);
+IF cycleManager.step.current > INIT THEN
+	cycleManager.assert.bitNumber.x.valueIsEqualTo(
+		currentValue := currentListVersion,
+		expectedValue := lastListChangeIndex,
+		message := 'List has changed during sort!'
+	);
+END_IF
+
+CASE cycleManager.step.current OF
+INIT:
+	cycleManager.configuration.sequence.requireSuccessStep := FALSE;
+	lastListChangeIndex := currentListVersion;
+	THIS^.sorterHead := head;
+	THIS^.sorterLast := OBJECT_NOT_REFERENCED;
+	THIS^.setComparator(comparator);
+	mergeSize := 1;
+	cycleManager.proceedWith(
+		step := SEL( (size > 1), SUCCESS, RUN_SORT)
+	);
+RUN_SORT:
+	IF (currentListVersion <> lastListChangeIndex) THEN
+		cycleManager.proceedWith(ERROR);
+		sort := CNM_ReturnTypes.SingleExecutionState.ERROR;
+		RETURN;
+	ELSE
+		IF THIS^.isObjectNull(leftElementToMerge) THEN 
+			mergesThisRun := 0;	
+			leftElementToMerge := THIS^.sorterHead;	
+			THIS^.sorterHead := OBJECT_NOT_REFERENCED;
+			THIS^.sorterLast := OBJECT_NOT_REFERENCED;		
+		END_IF;
+		
+		//one run trought the list from left to right
+		WHILE THIS^.isObjectValid(leftElementToMerge) DO
+			//only do merge if it won't exceed comparelimit, but allow at least one merge per Cycle
+			IF (comparesThisCycle > 0) AND_THEN (comparesThisCycle + mergeSizeLeft + mergeSizeRight > THIS^.upperCompareBound) THEN
+				EXIT;
+			END_IF
+			mergesThisRun := mergesThisRun + 1;
+			rightElementToMerge := leftElementToMerge;
+			//place rightElement mergeSize steps right of leftElement
+			mergeSizeLeft := 0;	
+			FOR index := 0 TO mergeSize-1 DO
+				mergeSizeLeft := mergeSizeLeft + 1;
+				rightElementToMerge := rightElementToMerge.next;
+				IF THIS^.isObjectNull(rightElementToMerge) THEN
+					EXIT;
+				END_IF
+			END_FOR
+			mergeSizeRight := mergeSize;
+			
+			THIS^.merge(	
+				leftElement := leftElementToMerge,
+				rightElement := rightElementToMerge,
+				mergeSizeLeft := mergeSizeLeft,
+				mergeSizeRight := mergeSizeRight,
+				mergeHead := THIS^.sorterHead,
+				mergeLast := THIS^.sorterLast,
+				comparesThisCycle := comparesThisCycle
+			);
+			
+			//set leftElementToMerge to first unmerged Element, as rightElementToMerge points to the Element behind the right Mergesection
+			leftElementToMerge := rightElementToMerge;
+		END_WHILE
+	
+		IF (mergesThisRun <= 1) AND THIS^.isObjectNull(leftElementToMerge) THEN
+			cycleManager.proceedWith(SUCCESS);
+		ELSIF THIS^.isObjectNull(leftElementToMerge) THEN
+			mergeSize := mergeSize * 2;
+		END_IF;
+	
+		head := THIS^.sorterHead;
+		last := THIS^.sorterLast;
+		
+		lastListChangeIndex := currentListVersion := currentListVersion + 1;
+	END_IF
+END_CASE
+
+sort := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="LinkedListMergeSorter">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedListMergeSorter.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="LinkedListMergeSorter.clone">
+      <LineId Id="1" Count="7" />
+      <LineId Id="11" Count="1" />
+      <LineId Id="9" Count="1" />
+    </LineIds>
+    <LineIds Name="LinkedListMergeSorter.instantSort">
+      <LineId Id="1" Count="54" />
+    </LineIds>
+    <LineIds Name="LinkedListMergeSorter.merge">
+      <LineId Id="1" Count="47" />
+      <LineId Id="50" Count="1" />
+      <LineId Id="53" Count="5" />
+    </LineIds>
+    <LineIds Name="LinkedListMergeSorter.moveRemainingElements">
+      <LineId Id="1" Count="22" />
+    </LineIds>
+    <LineIds Name="LinkedListMergeSorter.sort">
+      <LineId Id="277" Count="0" />
+      <LineId Id="265" Count="1" />
+      <LineId Id="268" Count="3" />
+      <LineId Id="267" Count="0" />
+      <LineId Id="273" Count="0" />
+      <LineId Id="188" Count="1" />
+      <LineId Id="276" Count="0" />
+      <LineId Id="193" Count="4" />
+      <LineId Id="201" Count="1" />
+      <LineId Id="191" Count="0" />
+      <LineId Id="203" Count="0" />
+      <LineId Id="261" Count="1" />
+      <LineId Id="274" Count="1" />
+      <LineId Id="263" Count="0" />
+      <LineId Id="206" Count="39" />
+      <LineId Id="247" Count="3" />
+      <LineId Id="253" Count="2" />
+      <LineId Id="204" Count="0" />
+      <LineId Id="258" Count="1" />
+      <LineId Id="264" Count="0" />
+      <LineId Id="190" Count="0" />
+      <LineId Id="256" Count="0" />
+      <LineId Id="85" Count="0" />
+      <LineId Id="257" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

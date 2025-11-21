@@ -1,0 +1,473 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="AbstractList" Id="{2b629813-b5c1-4f3a-82ef-fe84be1f4ca1}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+An abstract class to implement methods which are not dependent on the data structure.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+FUNCTION_BLOCK ABSTRACT AbstractList EXTENDS AbstractCollection IMPLEMENTS CNM_CollectionInterfaces.IList, IListHelpers
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="IInvertable" Id="{7f740e60-66fa-4816-bf00-cbce0395643e}" />
+    <Folder Name="IList" Id="{62a4bb1e-aabc-410e-b597-79cdc9f3500f}" />
+    <Folder Name="Protected" Id="{644572fe-6d8d-43f7-a6d5-566aa702cc93}" />
+    <Method Name="append" Id="{2f94a678-a1e8-4421-b2a0-aef19bec4fec}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds the given CNM_AbstractObject.IObject to the end of the list.
+**Example:** 
+Given a list that looks like this: (Head->) A B C (<- End),
+calling append(D) on this list will place the D at the and,
+making it the new End: (Head->) A B C D(<- End)
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD ABSTRACT append :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The object to be appended*)
+	object		:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="appendCollection" Id="{7683c611-f280-4c44-babd-251c57010f7c}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds all elements of the given collection to the end of this list.
+**Example:**
+For the list1: A B C and list2: D E F will be after ```list1.appendCollection(list2)```:
+A B C D E F. Notice the elements are still in the same order they where befor on each subsection.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: new Container not needed / could be allocated and data was copied
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: new Container couldn't be allocated, container left unchanged
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or the list itself was passed
+
+*)
+
+METHOD ABSTRACT appendCollection :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The collection to be appended*)
+	collectionToAppend :CNM_CollectionInterfaces.ICollection;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{10582c55-db61-4083-9788-f04923a8f973}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY ABSTRACT className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{3aba1fdd-6e04-4c57-a747-a77d7163f8be}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="dequeue" Id="{4cfb8acf-848a-4774-a99f-ffe05e6a908c}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns the last object in the first and removes it from the list. Can be seen as opposite of prepend.
+**Example:**
+On a list: (Head -->) A B C, list.dequeue will return A.
+**Example 2:**
+If you call prepend(x), a dequeue right after will return x.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD ABSTRACT dequeue :CNM_AbstractObject.IObject
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantSorting" Id="{95a9e5f9-fc11-490c-a487-db01b0bcc33e}">
+      <Declaration><![CDATA[METHOD INTERNAL ABSTRACT instantSorting : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	order :SortingOrder;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="invert" Id="{0c44c772-9e28-4418-9948-67542427477b}" FolderPath="IInvertable\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Inverts the order of the elements inside the object. Does not apply any kind of sorting, only reverses.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD ABSTRACT invert
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="listChangeIndex" Id="{4a39c870-b4a9-4712-a4a5-4a389152f463}">
+      <Declaration><![CDATA[PROPERTY INTERNAL listChangeIndex : __XWORD]]></Declaration>
+      <Get Name="Get" Id="{ab2d9eb5-0016-4ba9-ad68-3d99e1b0c30c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[listChangeIndex := THIS^.changesToCollection;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{fe091184-098e-45b5-b549-0ab74d4dff83}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.changesToCollection := listChangeIndex;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="pop" Id="{e0bcabef-ab01-4f7f-a77c-39577aa93bae}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns the last object in the list and removes it from the list. Can be seen as opposite of append.
+**Example:**
+On a list: (Head -->) A B C, list.pop will return C.
+**Example 2:**
+If you call append(x), a pop right after will return x.
+May return a null pointer if list is empty
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD ABSTRACT pop :CNM_AbstractObject.IObject
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="prepend" Id="{9b9a75f3-a9ed-488f-9162-4f48d410aef6}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds the given obejct to the end of the list.
+**Example:** 
+Given a list that looks like this: (Head->) A B C (<- End),
+calling prepend(D) on this list will place the D at start,
+making it the new Head: (Head->) D A B C (<- End)
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: new Container not needed / could be allocated and data was copied
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: new Container couldn't be allocated, container left unchanged
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or the list itself was passed
+	
+*)
+
+METHOD ABSTRACT prepend :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The object to be prepended*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="prependCollection" Id="{cc72048c-bb34-4d7a-977e-a4c8e0d3f058}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds all elements of the given collection to the start of this list. 
+**Example:**
+For the list1: A B C and list2: D E F will be after ```list1.prependCollection(list2)```:
+D E F A B C. Notice the elements are still in the same order they where befor on each subsection.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: prepend was successful
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: collection to prepend didn't fit in old container, and new container couldn't be allocated
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or this arraylist was passed
+	
+*)
+
+METHOD ABSTRACT prependCollection :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The collection to be prepended*)
+	collectionToPrepend :CNM_CollectionInterfaces.ICollection;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="remove" Id="{21c6097d-ebee-4bfc-801d-007662886f99}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method removes the first instance of the given object from the list.
+Compares objects with hash value.
+For example a Linked List: A B C A A D after remove(A) becomes: B C A A D
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD ABSTRACT remove
+VAR_INPUT
+	(*The object to be removed from the list*)
+	object		:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="sort" Id="{5f2cf59e-dae5-49ed-9433-37458a0b21e3}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns strategies to sort the list in a desired order.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY sort : CNM_CollectionInterfaces.ISortable
+]]></Declaration>
+      <Get Name="Get" Id="{83598f82-e208-43a8-a1c1-1305ac702373}">
+        <Declaration><![CDATA[VAR_INST
+	sortStrategy	:SortingStrategyExecutor(THIS^);
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[sort := sortStrategy;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="sorting" Id="{51417ece-cc2a-4d25-a4e8-7a332bc48937}">
+      <Declaration><![CDATA[METHOD INTERNAL ABSTRACT sorting : CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	execute :BOOL;
+	order :SortingOrder;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="AbstractList">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractList.append">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractList.appendCollection">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractList.className.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractList.dequeue">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractList.instantSorting">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractList.invert">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractList.listChangeIndex.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractList.listChangeIndex.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractList.pop">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractList.prepend">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractList.prependCollection">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractList.remove">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractList.sort.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractList.sorting">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

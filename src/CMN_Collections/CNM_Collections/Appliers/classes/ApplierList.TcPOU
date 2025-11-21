@@ -1,0 +1,236 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="ApplierList" Id="{0da2f14f-881c-4de6-8aa0-5e5d312c6756}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK ApplierList 
+EXTENDS AbstractDisposableContainer 
+IMPLEMENTS CNM_CollectionInterfaces.IApplierList
+VAR
+	myList 				:ArrayList;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="addApplier" Id="{68af4618-579b-4b6e-8305-ce0fa06d6b84}">
+      <Declaration><![CDATA[METHOD addApplier : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	applier :CNM_CollectionInterfaces.IApplier;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[addApplier := THIS^.myList.append(applier);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="addAppliers" Id="{da227758-b8a3-490f-aff3-a889fe750a71}">
+      <Declaration><![CDATA[METHOD addAppliers : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	appliers :CNM_CollectionInterfaces.ICollection;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[addAppliers := THIS^.myList.appendCollection(appliers);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{cab85bff-09ff-4f18-8418-6c14d67169a3}">
+      <Declaration><![CDATA[PROPERTY className : CNM_AbstractObject.ClassName]]></Declaration>
+      <Get Name="Get" Id="{8287f56e-3db3-4ca4-a6a6-7683ef91b264}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'ApplierList';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clear" Id="{ca95ceaf-935c-4b00-8eec-a63d633f06d7}">
+      <Declaration><![CDATA[METHOD clear : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.myList.clear();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clearContents" Id="{cddb2888-8427-4349-807a-3d9462896379}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD PROTECTED clearContents
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.myList.clear();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="count" Id="{c3668de9-1fa1-4d0a-bb73-26c8797e8b54}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns the amount of appliers in the list
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY count :UDINT
+]]></Declaration>
+      <Get Name="Get" Id="{0c4492a6-c317-47ac-94f7-9def00163ca8}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[count := THIS^.myList.size;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="FB_Exit" Id="{ee80e58c-9512-4e2c-aa22-b13f92561591}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it staiys in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectValid(THIS^.myList) THEN
+	THIS^.myList.deepDestruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getApplier" Id="{41c7edc8-21fe-42e7-9c86-c86c7e1c2247}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+A method to get an applier at the given index.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** CNM_ReturnTypes.ExecutionState
+
+*)
+
+METHOD getApplier : CNM_CollectionInterfaces.IApplier
+VAR_INPUT
+	index	:UDINT;
+END_VAR
+VAR
+	obj :CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.myList.getObjectAt(index := index, object => obj);
+__TRY
+	__QUERYINTERFACE(obj, getApplier);
+__CATCH
+	;
+__ENDTRY
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="list" Id="{a5ab7c37-2d37-4334-b1cc-e4d77bcd1e69}">
+      <Declaration><![CDATA[PROPERTY list : CNM_CollectionInterfaces.IArrayList]]></Declaration>
+      <Get Name="Get" Id="{7c7a9d45-ea51-4804-b997-fa8fa5ffea14}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[list := this^.myList;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="ApplierList">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="ApplierList.addApplier">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ApplierList.addAppliers">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ApplierList.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ApplierList.clear">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ApplierList.clearContents">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ApplierList.count.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ApplierList.FB_Exit">
+      <LineId Id="1" Count="3" />
+    </LineIds>
+    <LineIds Name="ApplierList.getApplier">
+      <LineId Id="1" Count="6" />
+    </LineIds>
+    <LineIds Name="ApplierList.list.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <DUT Name="SortingOrder" Id="{c8039159-8a5d-464e-898f-64c69a45bed5}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+{attribute 'hide'}
+TYPE FINAL SortingOrder :
+(
+	ASCENDING := 0,
+	DESCENDING
+) SINT;
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

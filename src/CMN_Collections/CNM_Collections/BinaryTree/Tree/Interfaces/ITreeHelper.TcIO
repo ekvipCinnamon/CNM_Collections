@@ -1,0 +1,147 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <Itf Name="ITreeHelper" Id="{382de372-05de-4cf1-bbbf-b01f7f2638fd}">
+    <Declaration><![CDATA[INTERFACE INTERNAL ITreeHelper EXTENDS CNM_AbstractObject.IObject
+]]></Declaration>
+    <Method Name="insert" Id="{9d735b5b-4e7d-44ce-8958-56efc31b5fed}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+A method to insert a single element into the tree.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: operation successful
+	``ABORTED``: operation was aborted (implementation specific)
+	``ERROR``: out of memory
+
+*)
+
+METHOD INTERNAL insert :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*the object that should be inserted*)
+	object :CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="insertCollection" Id="{0c3b4ccb-fb4b-433a-9abf-2a99bd6ba3fb}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method inserts all elements of a collection into the tree.
+
+If any value of the collection could not be inserted because of duplication, operation isn't aborted, 
+insertion is tried for every element of the collection.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if insert could be made
+	``ABORTED``: execute has a falling edge during insert,
+	``BUSY``: Insert is in Progress
+	``ERROR``: the passed collection where not valid / contained invalid Elements
+	``IDLE``: method was never started
+
+*)
+
+METHOD INTERNAL insertCollection :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*The collection that should be inserted*)
+	collection	:CNM_CollectionInterfaces.ICollection;
+	(*If insert should be processed*)
+	execute		:BOOL;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="instantInsertCollection" Id="{088a2062-b7fc-4128-8146-6f755bc807c3}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method inserts all elements of a collection into the tree
+This takes only one cycle.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: operation successful
+	``SingleExecutionResult.ERROR``: out of memory
+	``SingleExecutionResult.ABORTED``: collection to insert wasn't valid
+
+*)
+
+METHOD INTERNAL instantInsertCollection :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The collection that should be inserted*)
+	collection	:CNM_CollectionInterfaces.ICollection;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="remove" Id="{b14ba966-801c-4911-8e57-bceea6c5a67d}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Function to remove an object from the tree
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if remove could be made
+	``ABORTED``: if object wasn't in the tree
+	``ERROR``: if object wasn't valid
+
+*)
+
+METHOD INTERNAL remove :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(* The object that should be removed *)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

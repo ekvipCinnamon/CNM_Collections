@@ -1,0 +1,670 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="CollectionFactory" Id="{17b97c3b-75ab-4da0-b7a9-97d91c373ab7}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Class that provides factory methods for new collection instances.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+FUNCTION_BLOCK CollectionFactory EXTENDS CNM_AbstractObject.Object IMPLEMENTS CNM_CollectionInterfaces.ICollectionFactory
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="IObject" Id="{5f12e850-feb4-4d9f-bc42-89a49483a315}" />
+    <Property Name="className" Id="{151b42c6-e899-43fd-8f72-dd802284d97a}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{38b28968-0d76-44da-b1fb-9eac3db170da}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.CollectionFactory';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clone" Id="{03eaa529-030c-4fb5-95a5-32fb127f4a97}" FolderPath="IObject\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are not cloned for this there is the method `ICloneable.deepClone`.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+**Attention:** 
+	For derivations: **If a derived class needs ``clone`` this method must be overwritten.**
+	and don't forget the attribute ``{attribute 'enable_dynamic_creation'}``  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+	``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+	``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support cloning
+
+*)
+
+METHOD clone :CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (
+	Tc2_System.F_CheckMemoryArea(pData := THIS, nSize := SIZEOF(THIS^))
+	= Tc2_System.E_TcMemoryArea.Static
+) THEN
+	clonedObject := THIS^;
+	clone := CNM_ReturnTypes.CloneResult.SUCCESS;
+ELSE
+	clonedObject := 0;
+	clone := CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="deepClone" Id="{9b4d386b-5a25-4fe5-8ac5-83a3274bfb1c}" FolderPath="IObject\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are cloned too.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+If something goes wrong, then this method must clean up everything
+that has been cloned and free the memory again.
+**The deepClone either works completely, or not at all**
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+**Attention:** 
+	For derivations: **If a derived class needs ``deepClone`` this method must be overwritten.**
+	and don't forget the attribute ``{attribute 'enable_dynamic_creation'}``, even for container content 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support deep cloning
+
+*)
+
+METHOD deepClone :CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[deepClone := THIS^.clone(clonedObject => clonedObject);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getNewArrayList" Id="{0ea5898d-4065-43a8-9c90-f3cce1bbba5b}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+A method to generate a new ArrayList.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: allocation succesful, output arrayList contains new list
+    ``SingleExecutionResult.ERROR``: error during allocation, output arrayList is NULL
+
+*)
+
+METHOD getNewArrayList :CNM_ReturnTypes.SingleExecutionResult
+VAR_OUTPUT
+	(* the created array list *)
+	arrayList :CNM_CollectionInterfaces.IArrayList;
+END_VAR
+VAR
+	newList	:POINTER TO ArrayList;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[getNewArrayList := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+newList := __NEW(ArrayList);
+IF (newList <> 0) THEN
+	arrayList := newList^;
+	getNewArrayList := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;	
+END_IF
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getNewArrayListMergeSorter" Id="{c01e64a9-c44f-4faf-84c6-fe5b8d3d81ad}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method will create a new MergeSorter
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: allocation succesful, output sorter contains new sorter instance
+    ``SingleExecutionResult.ERROR``: error during allocation, output sorter is NULL
+
+*)
+
+METHOD getNewArrayListMergeSorter :CNM_ReturnTypes.SingleExecutionResult
+VAR_OUTPUT
+	(* the created array list merger sorter *)
+	sorter :CNM_CollectionInterfaces.IArrayListSorter;
+END_VAR
+VAR
+	newSorter :POINTER TO ArrayListMergeSorter;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[getNewArrayListMergeSorter := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+newSorter := __NEW(
+	ArrayListMergeSorter()
+);
+IF (newSorter <> 0) THEN
+	sorter := newSorter^;
+	getNewArrayListMergeSorter := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getNewArrayListShellSorter" Id="{58804996-0737-47db-b578-2e94ab9a3b37}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method will create a new shellsorter that can sort an Arraylist
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: allocation succesful, output sorter contains new sorter instance
+    ``SingleExecutionResult.ERROR``: error during allocation, output sorter is NULL
+	
+*)
+
+METHOD getNewArrayListShellsorter :CNM_ReturnTypes.SingleExecutionResult
+VAR_OUTPUT
+	(* the created array list shell sorter *)
+	sorter :CNM_CollectionInterfaces.IArrayListSorter;
+END_VAR
+VAR
+	newSorter :POINTER TO ArrayListShellSorter;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[getNewArrayListShellSorter := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+newSorter := __NEW(
+	ArrayListShellSorter()
+);
+IF (newSorter <> 0) THEN
+	sorter := newSorter^;
+	getNewArrayListShellSorter := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getNewBBSTree" Id="{f948452f-8d80-4997-aef8-c27970540806}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method can be used to dynamically create a __NEW binary balanced search tree.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: allocation succesful, output tree contains new tree instance
+    ``SingleExecutionResult.ERROR``: error during allocation, output tree is NULL
+
+*)
+
+METHOD getNewBBSTree :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*optional custom comparator*)
+	comparator : CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_OUTPUT
+	(* the created tree *)
+	tree :CNM_CollectionInterfaces.IBalancedBinarySearchTree;
+END_VAR 
+VAR
+	newBalancedBinarySearchTree 	:POINTER TO BalancedBinarySearchTree;
+END_VAR
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED 			:__XWORD		:= 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[getNewBBSTree := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+IF THIS^.isObjectValid(comparator) THEN
+	newBalancedBinarySearchTree := __NEW(
+	BalancedBinarySearchTree(nodeComparator := comparator)
+	);
+ELSE
+	newBalancedBinarySearchTree := __NEW(
+	BalancedBinarySearchTree(nodeComparator := OBJECT_NOT_REFERENCED)
+	);
+END_IF
+
+IF (newBalancedBinarySearchTree <> 0) THEN
+	tree := newBalancedBinarySearchTree^;
+	getNewBBSTree := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getNewBBSTreeNode" Id="{aa791f46-344b-47df-94f3-0c884cad60e9}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+function to create a new balanced binary searchtree node
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: allocation succesful, output node contains new tree node instance
+    ``SingleExecutionResult.ERROR``: error during allocation, output node is NULL
+
+*)
+
+METHOD getNewBBSTreeNode :CNM_ReturnTypes.SingleExecutionResult 
+VAR_INPUT
+	(* the object that should be wrapped *)
+	object :CNM_AbstractObject.IObject;
+END_VAR
+VAR_OUTPUT
+	(* the created tree node container element *)
+	node :CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR 
+	newTreeNode 		:POINTER TO BalancedBinarySearchTreeNode;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED 	:__XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[getNewBBSTreeNode := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+newTreeNode := __NEW(
+	BalancedBinarySearchTreeNode(
+		value := object,
+		left := IS_NOT_REFERENCED,
+		right := IS_NOT_REFERENCED
+	)
+);
+IF (newTreeNode <> 0) THEN
+	newTreeNode^.leftChild := IS_NOT_REFERENCED;
+	newTreeNode^.rightChild := IS_NOT_REFERENCED;
+	node := newTreeNode^;
+	getNewBBSTreeNode := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getNewDoublyLinkedElement" Id="{1a97fdb0-a009-490f-a378-440341ee84fa}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Method to create new Instance of DoublyLinkedElements and automatically link with other ellements.
+This will affect/change the next and previouse elements !
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: allocation succesful, output element contains new list element instance
+    ``SingleExecutionResult.ERROR``: error during allocation, output element is NULL
+
+*)
+
+METHOD getNewDoublyLinkedElement :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*the dataobject to be contained inside the element*)
+	object					:CNM_AbstractObject.IObject;
+	(*the previous element to link to*)
+	previousElement			:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*the next element to link to*)
+	nextElement				:CNM_CollectionInterfaces.IDoublyLinkedElement;	
+	(*a flag if the link to next and previous should be created*)
+	linkElements			:BOOL := TRUE;
+END_VAR
+VAR_OUTPUT
+	(* the created array linked list container element *)
+	element :CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+VAR
+	newElement		:POINTER TO DoublyLinkedElement;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[getNewDoublyLinkedElement := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+newElement := __NEW(
+	DoublyLinkedElement(
+		content		:= object,
+		previous	:= previousElement,
+		next		:= nextElement
+	)
+);
+
+IF (newElement <> 0) THEN
+	IF (linkElements) THEN
+		IF (THIS^.isObjectValid(previousElement)) THEN
+			previousElement.next := newElement^;
+		END_IF
+		IF (THIS^.isObjectValid(nextElement)) THEN
+			nextElement.previous := newElement^;
+		END_IF	
+	END_IF
+	element := newElement^;
+	getNewDoublyLinkedElement := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getNewLinkedList" Id="{beddd41c-9675-4869-bb1c-f66b1fc0496c}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+A method to generate a new LinkedList.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD getNewLinkedList :CNM_ReturnTypes.SingleExecutionResult
+VAR_OUTPUT
+	(* the created linked list *)
+	list :CNM_CollectionInterfaces.ILinkedList;
+END_VAR
+VAR
+	newList	:POINTER TO LinkedList;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[getNewLinkedList := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+newList := __NEW(
+	LinkedList()
+);
+IF (newList <> 0) THEN
+	list := newList^;
+	getNewLinkedList := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getNewLinkedListMergeSorter" Id="{a8e3b4b9-c2b9-47aa-bfe2-391d91d6dd3b}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method will create a new MergeSorter for linked lists.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD getNewLinkedListMergeSorter : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_OUTPUT
+	(* the created linked list merge sorter *)
+	sorter	: CNM_CollectionInterfaces.ILinkedListSorter;
+END_VAR
+VAR
+	newMergeSorter :POINTER TO LinkedListMergeSorter; 
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[getNewLinkedListMergeSorter := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+newMergeSorter := __NEW(LinkedListMergeSorter());
+
+IF (newMergeSorter <> 0) THEN
+	sorter := newMergeSorter^;
+	getNewLinkedListMergeSorter := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="CollectionFactory">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="CollectionFactory.className.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="CollectionFactory.clone">
+      <LineId Id="54" Count="4" />
+      <LineId Id="62" Count="0" />
+      <LineId Id="59" Count="2" />
+      <LineId Id="2" Count="0" />
+      <LineId Id="63" Count="0" />
+    </LineIds>
+    <LineIds Name="CollectionFactory.deepClone">
+      <LineId Id="4" Count="0" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="CollectionFactory.getNewArrayList">
+      <LineId Id="21" Count="1" />
+      <LineId Id="25" Count="4" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="CollectionFactory.getNewArrayListMergeSorter">
+      <LineId Id="168" Count="0" />
+      <LineId Id="163" Count="3" />
+      <LineId Id="169" Count="0" />
+      <LineId Id="171" Count="0" />
+      <LineId Id="170" Count="0" />
+      <LineId Id="13" Count="0" />
+    </LineIds>
+    <LineIds Name="CollectionFactory.getNewArrayListShellSorter">
+      <LineId Id="95" Count="7" />
+      <LineId Id="94" Count="0" />
+    </LineIds>
+    <LineIds Name="CollectionFactory.getNewBBSTree">
+      <LineId Id="90" Count="0" />
+      <LineId Id="41" Count="0" />
+      <LineId Id="47" Count="1" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="49" Count="0" />
+      <LineId Id="51" Count="1" />
+      <LineId Id="50" Count="0" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="88" Count="1" />
+      <LineId Id="93" Count="0" />
+      <LineId Id="91" Count="1" />
+      <LineId Id="87" Count="0" />
+    </LineIds>
+    <LineIds Name="CollectionFactory.getNewBBSTreeNode">
+      <LineId Id="87" Count="0" />
+      <LineId Id="7" Count="6" />
+      <LineId Id="91" Count="1" />
+      <LineId Id="94" Count="2" />
+      <LineId Id="93" Count="0" />
+      <LineId Id="86" Count="0" />
+    </LineIds>
+    <LineIds Name="CollectionFactory.getNewDoublyLinkedElement">
+      <LineId Id="41" Count="0" />
+      <LineId Id="11" Count="16" />
+      <LineId Id="42" Count="1" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="40" Count="0" />
+    </LineIds>
+    <LineIds Name="CollectionFactory.getNewLinkedList">
+      <LineId Id="11" Count="0" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="8" Count="2" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="CollectionFactory.getNewLinkedListMergeSorter">
+      <LineId Id="1" Count="7" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

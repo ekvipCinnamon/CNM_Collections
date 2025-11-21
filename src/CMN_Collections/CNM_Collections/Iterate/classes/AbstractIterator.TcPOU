@@ -1,0 +1,325 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="AbstractIterator" Id="{dc1f2852-1535-4ef8-96a7-02f833cb398b}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+An abstract class to implement most basic iterator functions for use in custom Iterators.
+Users still need to implement iterate and hasNext, as these depend on the data-stucture.
+Iterate should take care to assign ``THIS^.current`` in their iterate implementation.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+FUNCTION_BLOCK ABSTRACT AbstractIterator EXTENDS CNM_AbstractObject.Object IMPLEMENTS CNM_CollectionInterfaces.IIterator
+VAR
+	{attribute 'no_copy'}
+	currentObject :CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="current" Id="{5932fb5e-12e5-4be8-8e0d-0dbc2d401f9c}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns the current element which the iterator points to.
+
+**Attention:** 
+	If current is used multiple times between two iterate calls, 
+	current is only guarenteed to return an object that is actually in the list fo rthe first call to current that happens
+	immediatly after the first iteration call.
+	
+**Example:**
+```
+WHILE(iterator.moveNext())DO
+	foo := iterator.current.hashCode;
+	bar := iterator.current.name;
+END_WHILE
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY current :CNM_AbstractObject.IObject
+
+]]></Declaration>
+      <Get Name="Get" Id="{9b5d38b6-a6c9-44fa-8123-2c97f5a7c3ef}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[current := THIS^.currentObject;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{88716249-62f3-49e8-a0a4-111640824425}">
+        <Declaration><![CDATA[PROTECTED 
+VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.currentObject := current;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="getNext" Id="{6412bf02-cca6-4e53-8dba-8997c6550f17}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns the next object from the iterator and move the iterator to it.
+If there is no next object, this should return NULL.
+
+**Example:**
+```
+WHILE(iterator.hasNext())DO
+	iterator.getNext().hashcode;
+END_WHILE
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_AbstractObject.IObject``: next object in collection, NULL if End of Collection is reached
+
+*)
+
+METHOD FINAL getNext :CNM_AbstractObject.IObject
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.iterate(execute := TRUE );
+getNext := THIS^.current;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="hasNext" Id="{153c4096-c902-4a9c-9ddf-03aa03859db7}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns if there exists another element to iterate to.
+
+**Example:**
+```
+WHILE(iterator.hasNext())DO
+	iterator.getNext().foo();
+END_WHILE
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``TRUE``: Iterator has a next object that can be fetched with getNext()
+	``FALSE``: Iterator finished
+
+*)
+
+METHOD ABSTRACT hasNext :BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="iterate" Id="{570be6e8-34de-40c1-8171-b5d34af7b833}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method delivers the next object from the collection and returns the current state of iteration.
+
+**Example:**
+You have a list: 1 2 3
+the first iterate call will return CNM_ReturnTypes.BUSY and object = 1
+the second iterate call will return CNM_ReturnTypes.BUSY and object = 2
+the third iterate call will return CNM_ReturnTypes.BUSY and object = 3
+the forth iterate call will return CNM_ReturnTypes.SUCCESS and object = NULL
+
+**Attention:** iterators MUST assign the currently returned 'object' to ```THIS^.current``` as well! 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if last object from collection was already returned,
+    ``ABORTED``: execute has a falling edge during iterate,
+    ``BUSY``: When iterate had rising edge on execute and not all objects had been returned yet,
+    ``IDLE``: iterate wasn't started yet,
+	``ERROR``: error occured during iteration
+	
+*)
+
+METHOD ABSTRACT iterate :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*control bit to start or abort the iterate (see SingleExecutionState)*)
+	execute	:BOOL;
+END_VAR
+VAR_OUTPUT
+	(*the returned object of the iteration*)
+	object		:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="moveNext" Id="{96c519e8-95e4-429d-9e98-09477b83147b}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns true if there exists another element to iterate to and fetches the next element to THIS^.current.
+It return false if no further elements exist in the collection, in this case it sets THIS^.current to NULL.
+
+**Example:**
+```
+WHILE(iterator.moveNext())DO
+	iterator.current.foo();
+END_WHILE
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``TRUE``: Iterator had a next object that can be now accessed with current
+	``FALSE``: Iterator finished, current will be NULL
+
+*)
+
+METHOD FINAL moveNext :BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[moveNext := THIS^.hasNext();
+THIS^.getNext();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="reset" Id="{a17c6fc8-56b0-433d-af1f-9069f7a86a96}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method resets the iterator.
+
+**Example:**
+```
+iterator.reset();
+WHILE(iterator.moveNext())DO
+	foo := iterator.current.hashCode;
+	bar := iterator.current.name;
+END_WHILE
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD reset
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.iterate(execute := FALSE);
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="AbstractIterator">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractIterator.current.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractIterator.current.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractIterator.getNext">
+      <LineId Id="1" Count="2" />
+    </LineIds>
+    <LineIds Name="AbstractIterator.hasNext">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractIterator.iterate">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractIterator.moveNext">
+      <LineId Id="1" Count="2" />
+    </LineIds>
+    <LineIds Name="AbstractIterator.reset">
+      <LineId Id="10" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

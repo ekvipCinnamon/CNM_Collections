@@ -1,0 +1,85 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="log2" Id="{fe2dc51f-8c9a-4d5f-a1ea-0c67029e3ab1}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This function calculates the logarithmus dualis (ld or log_2). 
+It uses [black magic](https://en.wikipedia.org/wiki/De_Bruijn_sequence). Actually it calculates the log2 and truncates it. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+FUNCTION log2 : USINT
+VAR_INPUT
+	value :__UXINT(1..MAX_UXINT);
+END_VAR
+VAR
+	architectureIndex :__XWORD;
+	registerSize :USINT;
+END_VAR
+VAR CONSTANT
+	MAX_UXINT :__UXINT := TO___UXINT(-1);
+	DE_BRUIJN_SEQUENCE	:ARRAY[0..2] OF LWORD := [16#09AF ,16#077CB531, 16#022FDD63CC95386D];
+	REGISTER_SIZE_IN_BYTES	:USINT := SIZEOF(__XWORD);
+	DE_BRUIJN_LOOKUP :ARRAY[0..2] OF ARRAY[0..63] OF USINT := [
+		[
+			0, 1, 10, 2, 11, 14, 7, 3, 
+        	12, 15, 8, 6, 13, 9, 5, 4
+		],
+		[
+	    	0,  1, 28,  2, 29, 14, 24,  3, 
+	    	30, 22, 20, 15, 25, 17,  4,  8, 
+	    	31, 27, 13, 23, 21, 19, 16,  7, 
+		    26, 12, 18,  6, 11,  5, 10,  9	
+		],
+		[
+			0,  1,  2, 53,  3,  7, 54, 27,
+			4, 38, 41,  8, 34, 55, 48, 28,
+			62,  5, 39, 46, 44, 42, 22,  9,
+			24, 35, 59, 56, 49, 18, 29, 11,
+			63, 52,  6, 26, 37, 40, 33, 47,
+			61, 45, 43, 21, 23, 58, 17, 10,
+			51, 25, 36, 32, 60, 20, 57, 16,
+			50, 31, 19, 15, 30, 14, 13, 12		
+		]
+	];
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[log2 := TO_USINT(-1);
+RETURN(value <= 0);
+architectureIndex := SHR(REGISTER_SIZE_IN_BYTES,2);
+registerSize := SHL(REGISTER_SIZE_IN_BYTES,3);
+value := value OR SHR(value, 1);
+value := value OR SHR(value, 2);
+value := value OR SHR(value, 4);
+value := value OR SHR(value, 8);
+value := SEL((REGISTER_SIZE_IN_BYTES > 2), value, (value OR SHR(value, 16)));
+value := SEL((REGISTER_SIZE_IN_BYTES > 4), value, (value OR SHR(value, 32)));
+IF (value = MAX_UXINT) THEN
+	log2 := registerSize - 1;
+ELSE
+	log2 := DE_BRUIJN_LOOKUP[architectureIndex][
+		SHR((value + 1) * DE_BRUIJN_SEQUENCE[architectureIndex],registerSize - (4 + architectureIndex))
+	] - 1;
+END_IF
+]]></ST>
+    </Implementation>
+    <LineIds Name="log2">
+      <LineId Id="1" Count="17" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

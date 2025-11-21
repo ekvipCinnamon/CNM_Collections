@@ -1,0 +1,814 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="concretBBSTreeTest" Id="{bd0451be-c7c3-4b2b-b408-bc37bb8e70db}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+short summary
+=================
+A functionblock to test the concrete Treeimplementation from the CNM_Collections Library. 
+These tests are dependend on the implementations, since they check the rotations that are performed during insert and remove.
+Other implementation independed tests can be found in the CNM_Collection_TestLib
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+parameters
+=========================
+
+*)
+FUNCTION_BLOCK concretBBSTreeTest EXTENDS TcUnit.FB_TestSuite
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	treeFactory 		:CNM_CollectionInterfaces.ICollectionFactory;
+	testObjectFactory	:CNM_CollectionTestLib.testObjectFactory;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[THIS^.insertElementInEmptyTree('');
+THIS^.removeElements('');
+THIS^.insertElementsToCheckRotation('');
+THIS^.nodesAreInCorrectOrderWithReverseOrderComparator('');
+]]></ST>
+    </Implementation>
+    <Folder Name="helpers" Id="{36e98b81-45d6-4c2b-a50f-077a5a58afa2}" />
+    <Method Name="checkNodeReverseOrder" Id="{ce61fc11-b5cc-4383-bc53-efc6890d20df}" FolderPath="helpers\">
+      <Declaration><![CDATA[METHOD checkNodeReverseOrder : BOOL
+VAR_INPUT
+	currentNode						:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR
+	comparator						:CNM_CollectionTestLib.ReverseOrderComparator;
+    leftGreater 					:BOOL;
+    rightGreater					:BOOL;
+END_VAR
+VAR_IN_OUT
+	leftChildsCurrentNode			:CNM_CollectionInterfaces.IBinaryTreeNode;
+	rightChildsCurrentNode			:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF currentNode = 0 THEN
+	// An empty node is considered valid
+	checkNodeReverseOrder := TRUE;
+	RETURN;
+END_IF
+    
+// Initialize children validity
+leftGreater := TRUE;
+rightGreater := TRUE;
+
+// Check the left child
+IF currentNode.leftChild <> 0 THEN
+	IF comparator.compare(currentNode.leftChild, currentNode) = CNM_ReturnTypes.ComparationResult.GREATER THEN
+		leftGreater := FALSE;
+		leftChildsCurrentNode := currentNode;
+	ELSE
+		leftGreater := THIS^.checkNodeReverseOrder(currentNode.leftChild, leftChildsCurrentNode, rightChildsCurrentNode);
+	END_IF
+END_IF
+
+// Check the right child
+IF currentNode.rightChild <> 0 THEN
+	IF comparator.compare(currentNode.rightChild, currentNode) = CNM_ReturnTypes.ComparationResult.SMALLER THEN
+		rightGreater := FALSE;
+		rightChildsCurrentNode := currentNode;
+	ELSE
+		rightGreater := THIS^.checkNodeReverseOrder(currentNode.rightChild, leftChildsCurrentNode, rightChildsCurrentNode);
+	END_IF
+END_IF
+
+checkNodeReverseOrder := leftGreater AND rightGreater;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{66548f2b-b67a-4156-8a34-d018adc144cb}">
+      <Declaration><![CDATA[(*
+
+short summary
+=================
+function to create a new balanced binary searchtree node
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+parameters
+=========================
+
+*)
+METHOD FB_init :BOOL
+VAR_INPUT
+    bInitRetains 	:BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+    bInCopyCode		:BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+	(*The factory that is used to instantiate new trees*)
+	Treefactory 	:CNM_CollectionInterfaces.ICollectionFactory;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.treefactory := Treefactory;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="generateTestmessage" Id="{98c90b69-2a54-4dc3-bdb1-852234cd17c1}" FolderPath="helpers\">
+      <Declaration><![CDATA[(*
+
+short summary
+=================
+helperfunction that creates the full testmessage
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+parameters
+=========================
+:return: the complete Testmessage
+*)
+METHOD generateTestmessage :STRING
+VAR_INPUT
+	(*The name of the test*)
+	name :STRING(255);
+	(*The message that should be printed*)
+	msg :STRING; 
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[generateTestmessage := CONCAT((CONCAT('For Test: ',name)),msg);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="insertElementInEmptyTree" Id="{790afa5e-e259-4d9a-8b3b-eff4b078c610}">
+      <Declaration><![CDATA[(*
+
+short summary
+=================
+Test that 
+- tries to insert a null object and assumes that it fails (no null objects are allowed in collections)
+- checks that the root of an empty tree is null 
+- and that the insert of a single insert is a success and the root now contains this element
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+parameters
+=========================
+
+*)
+
+METHOD insertElementInEmptyTree
+VAR_INPUT
+	(*unique Identifier for each instance to differentiate between multiple instances*)
+	testInstanceIdentifier 	:STRING(255);
+END_VAR
+VAR
+	tree 					:TreeTestClass(OBJECT_NOT_REFERENCED);
+	treePointer 			:POINTER TO CNM_Collections.BalancedBinarySearchTree;
+	testname				:STRING(255);
+	newnode 				:CNM_AbstractObject.IObject;
+END_VAR
+VAR CONSTANT
+	{attribute 'suppress_warning_0' := 'C0228'}
+	OBJECT_NOT_REFERENCED 	:__XWORD	:= 0;
+	{attribute 'restore_warning_0' := 'C0228'}
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[testname := CONCAT('insertInEmptyTree',testInstanceIdentifier);
+IF TEST_ORDERED(testname) THEN 
+	AssertTrue(tree.tree.insert(newnode) = CNM_ReturnTypes.SingleExecutionResult.ABORTED,generateTestmessage(testInstanceIdentifier,'insert of an null object didnt return ABORTED as expected'));
+	newnode := THIS^.testobjectfactory.getNewTestObject(value:=2);
+	
+	//Asserts
+	AssertTrue(Condition := newnode.isObjectNull(tree.testRootNode) , generateTestmessage(name:=testInstanceIdentifier,msg:='the testRootNode of the empty tree where not null'));
+	ASSERTTRUE(tree.tree.insert(object:=newnode)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, generateTestmessage(name := testInstanceIdentifier, msg := 'inserting of Node Fooobject(2) failed'));
+	IF  newnode.isObjectNull(tree.testRootNode) THEN
+		AssertFalse(Condition :=TRUE, generateTestmessage(name := testInstanceIdentifier, msg :='after insert an object, the testRootNode was still null'));
+		TEST_FINISHED();
+		RETURN;
+	END_IF;
+	AssertTrue(Condition := tree.testRootNode.object.isEqual(newNode), generateTestmessage(name := testInstanceIdentifier, 'after inserting root wasn$'t the object that was inserted'));
+	TEST_FINISHED();
+	IF tree.isObjectValid(newNode) THEN
+		newNode.deepDestruct();
+	END_IF
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="insertElementsToCheckRotation" Id="{19a7c6a7-a38f-47d9-a569-7b4aceb69aa7}">
+      <Declaration><![CDATA[(*
+
+short summary
+=================
+Test that checks if the rotations used for balancing are performed correct during insert of elements.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+parameters
+=========================
+
+*)
+
+METHOD insertElementsToCheckRotation
+VAR_INPUT
+	(*The identifier used to differentiate between mutliple instances of this test*)
+	testInstanceIdentifier 	:STRING(255);
+END_VAR
+VAR
+	tree 					:TreeTestClass(OBJECT_NOT_REFERENCED);
+	testname				:STRING(255);
+	node10 					:CNM_AbstractObject.IObject;
+	node20 					:CNM_AbstractObject.IObject;
+	node4 					:CNM_AbstractObject.IObject;
+	node15 					:CNM_AbstractObject.IObject;
+	node17 					:CNM_AbstractObject.IObject;
+	node3 					:CNM_AbstractObject.IObject;
+	node2 					:CNM_AbstractObject.IObject;
+	node1 					:CNM_AbstractObject.IObject;
+	iterateObject 			:CNM_AbstractObject.IObject;
+	rootNode 				:POINTER TO CNM_CollectionTestLib.testObject;
+	binaryRoot 				:CNM_CollectionInterfaces.IBinaryTreeNode;
+	rootNodeOrderValue 		:INT;
+	iterator				:CNM_CollectionInterfaces.IIterator;
+END_VAR
+VAR CONSTANT
+	{attribute 'suppress_warning_0' := 'C0228'}
+	OBJECT_NOT_REFERENCED 	:__XWORD 	:= 0;
+	{attribute 'restore_warning_0' := 'C0228'}
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[testname := CONCAT('TreeCheckRotation',testInstanceIdentifier);
+IF TEST_ORDERED(testname)  THEN 
+	//pre test
+	node10 := THIS^.testobjectfactory.getNewTestObject(value:=10);
+	node20 := THIS^.testobjectfactory.getNewTestObject(value:=20);
+	node4 := THIS^.testobjectfactory.getNewTestObject(value:=4);
+	node15 := THIS^.testobjectfactory.getNewTestObject(value:=15);
+	node17 := THIS^.testobjectfactory.getNewTestObject(value:=17);
+	node3 := THIS^.testobjectfactory.getNewTestObject(3);
+	node2 := THIS^.testobjectfactory.getNewTestObject(2);
+	node1 := THIS^.testobjectfactory.getNewTestObject(1);
+	AssertTrue(tree.tree.insert(node2)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, generateTestmessage(name := testname, msg := 'inserting of not existing Node Fooobject(2) failed'));
+	AssertTrue(tree.tree.insert(node1)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, generateTestmessage(name := testname, msg := 'inserting of not existing Node Fooobject(1) failed'));
+	AssertTrue(tree.tree.insert(node3)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, generateTestmessage(name := testname, msg := 'inserting of not existing Node Fooobject(3) failed'));
+	AssertTrue(tree.tree.insert(node10)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, generateTestmessage(name := testname, msg := 'inserting of not existing Node Fooobject(10) failed'));
+	AssertTrue(tree.tree.insert(node20)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, generateTestmessage(name := testname, msg := 'inserting of not existing Node Fooobject(20) failed'));
+	__QUERYINTERFACE(tree.testRootNode,binaryroot);
+	//LeftRotation Expected
+		IF tree.isObjectNull(binaryroot.rightChild) THEN 
+			AssertFalse(Condition := TRUE, generateTestmessage(name := testname, msg :='after insert an object greater than root, root.rightChild was still null'));
+			TEST_FINISHED();
+			RETURN;	
+		END_IF
+		AssertTrue(Condition := binaryRoot.rightChild.object = node10, Message:='after LRotation the rotroot wasnt what was exp(10)');
+		AssertTrue(Condition := binaryRoot.rightChild.leftChild.object = node3, Message:='after LRotation the rotroot.lchild wasnt what was exp(3)');
+		AssertTrue(Condition := binaryRoot.rightChild.rightChild.object = node20, Message:='after LRotation the rotroot.rchild wasnt what was exp(20)');
+	AssertTrue(tree.tree.insert(node4)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, generateTestmessage(name := testname, msg := 'inserting of not existing Node Fooobject(4) failed'));
+	AssertTrue(tree.tree.insert(node17)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, generateTestmessage(name := testname, msg := 'inserting of not existing Node Fooobject(17) failed'));
+	AssertTrue(tree.tree.insert(node15)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, generateTestmessage(name := testname, msg := 'inserting of not existing Node Fooobject(15) failed'));
+	
+	//requery treenode because it should have changed due to rotation
+	__QUERYINTERFACE(tree.testRootNode,binaryRoot);
+	
+	IF node10.isObjectNull(binaryroot) THEN 
+			AssertFalse(Condition := TRUE, generateTestmessage(name := testname, msg :='root was unexpected null'));
+			TEST_FINISHED();
+			RETURN;	
+	END_IF
+		AssertTrue(Condition := binaryRoot.object = node3, Message:='after DRotation the root wasnt what was exp(3)');
+	//at this point it is sure that binaryroot is unequal zero
+
+	IF binaryRoot.isObjectNull(binaryroot.leftChild) THEN
+			AssertFalse(Condition := TRUE, generateTestmessage(name := testname, msg :='root.left was unexpected null'));
+			TEST_FINISHED();
+			RETURN;	
+	END_IF
+	AssertTrue(Condition := binaryRoot.leftChild.object = node2, generateTestmessage(name := testname, msg := 'after DRotation, root.left wasnt exp(2)'));
+	
+	IF binaryRoot.isObjectNull(binaryroot.leftChild.leftChild) THEN
+			AssertFalse(Condition := TRUE, generateTestmessage(name := testname, msg :='root.left.left was unexpected null'));
+			TEST_FINISHED();
+			RETURN;	
+	END_IF
+	AssertTrue(Condition := binaryRoot.leftChild.leftChild.object = node1, generateTestmessage(name := testname, msg := 'after DRotation, root.left.left wasnt exp(1)'));
+	
+	IF binaryRoot.isObjectNull(binaryroot.rightChild) THEN
+			AssertFalse(Condition := TRUE, generateTestmessage(name := testname, msg :='root.right was unexpected null'));
+			TEST_FINISHED();
+			RETURN;	
+	END_IF
+	AssertTrue(Condition := binaryRoot.rightChild.object = node10, generateTestmessage(name := testname, msg := 'after DRotation, root.right wasnt exp(10)'));
+	
+	IF binaryRoot.isObjectNull(binaryroot.rightChild.leftChild) THEN
+			AssertFalse(Condition := TRUE, generateTestmessage(name := testname, msg :='root.right.left was unexpected null'));
+			TEST_FINISHED();
+			RETURN;	
+	END_IF
+	AssertTrue(Condition := binaryRoot.rightChild.leftChild.object = node4, generateTestmessage(name := testname, msg := 'after DRotation, root.right.left wasnt exp(4)'));
+		
+	IF binaryRoot.isObjectNull(binaryroot.rightChild.rightChild) THEN
+			AssertFalse(Condition := TRUE, generateTestmessage(name := testname, msg :='root.right.right was unexpected null'));
+			TEST_FINISHED();
+			RETURN;	
+	END_IF
+	AssertTrue(Condition := binaryRoot.rightChild.rightChild.object = node17, generateTestmessage(name := testname, msg := 'after RRotation, root.right.right wasnt exp(17)'));
+	
+	IF binaryRoot.isObjectNull(binaryroot.rightChild.rightChild.leftChild) THEN
+			AssertFalse(Condition := TRUE, generateTestmessage(name := testname, msg :='root.right.right.left was unexpected null'));
+			TEST_FINISHED();
+			RETURN;	
+	END_IF
+	AssertTrue(Condition := binaryRoot.rightChild.rightChild.leftChild.object = node15, generateTestmessage(name := testname, msg := 'after RRotation, root.right.right.left wasnt exp(15)'));
+	
+	IF binaryRoot.isObjectNull(binaryroot.rightChild.rightChild.rightChild) THEN
+			AssertFalse(Condition := TRUE, generateTestmessage(name := testname, msg :='root.right.right.right was unexpected null'));
+			TEST_FINISHED();
+			RETURN;	
+	END_IF
+	AssertTrue(Condition := binaryRoot.rightChild.rightChild.rightChild.object = node20, generateTestmessage(name := testname, msg := 'after RRotation, root.right.right.right wasnt exp(20)'));
+	//Test that leafs are true leafs and have no childs
+	ASSERTTRUE(Condition := binaryroot.isObjectNull(binaryroot.leftChild.leftChild.leftChild), Message:=generateTestmessage(name:=testname, msg := 'leaf(1) leftchild was not null'));
+	ASSERTTRUE(Condition := binaryroot.isObjectNull(binaryroot.leftChild.leftChild.rightChild), Message:=generateTestmessage(name:=testname, msg := 'leaf(1) rightchild was not null'));	
+	ASSERTTRUE(Condition := binaryroot.isObjectNull(binaryroot.leftChild.rightChild), Message:=generateTestmessage(name:=testname, msg := 'leaf(2) rightchild was not null'));
+	ASSERTTRUE(Condition := binaryroot.isObjectNull(binaryroot.rightChild.rightChild.leftChild.leftChild), Message:=generateTestmessage(name:=testname, msg := 'leaf(15) leftchild was not null'));
+	ASSERTTRUE(Condition := binaryroot.isObjectNull(binaryroot.rightChild.rightChild.leftChild.rightChild), Message:=generateTestmessage(name:=testname, msg := 'leaf(15) rightchild was not null'));
+	ASSERTTRUE(Condition := binaryroot.isObjectNull(binaryroot.rightChild.leftChild.leftChild), Message:=generateTestmessage(name:=testname, msg := 'leaf(4) leftchild was not null'));
+	ASSERTTRUE(Condition := binaryroot.isObjectNull(binaryroot.rightChild.leftChild.rightChild), Message:=generateTestmessage(name:=testname, msg := 'leaf(4) rightchild was not null'));
+	ASSERTTRUE(Condition := binaryroot.isObjectNull(binaryroot.rightChild.rightChild.rightChild.leftChild), Message:=generateTestmessage(name:=testname, msg := 'leaf(20) leftchild was not null'));
+	ASSERTTRUE(Condition := binaryroot.isObjectNull(binaryroot.rightChild.rightChild.rightChild.rightChild), Message:=generateTestmessage(name:=testname, msg := 'leaf(20) rightChild was not null'));
+	//Test Treesize
+	AssertEquals_LWORD(Expected := 8,Actual := tree.size,Message := generateTestmessage(name := testname, msg := 'treesize wasnt correct after insert'));
+	//Test the containsObject 
+	ASSERTTRUE(Condition := tree.containsObject(object := node10), Message := generateTestmessage(name := testname, msg := 'containsObject(10) failed for existing node'));
+	ASSERTTRUE(Condition := tree.containsObject(object := node20), Message := generateTestmessage(name := testname, msg := 'containsObject(20) failed for existing node'));
+	ASSERTTRUE(Condition := tree.containsObject(object := node4), Message := generateTestmessage(name := testname, msg := 'containsObject(4) failed for existing node'));
+	ASSERTTRUE(Condition := tree.containsObject(object := node15), Message := generateTestmessage(name := testname, msg := 'containsObject(15) failed for existing node'));
+	ASSERTTRUE(Condition := tree.containsObject(object := node17), Message := generateTestmessage(name := testname, msg := 'containsObject(17) failed for existing node'));
+	ASSERTTRUE(Condition := tree.containsObject(object := node3), Message := generateTestmessage(name := testname, msg := 'containsObject(3) failed for existing node'));
+	ASSERTTRUE(Condition := tree.containsObject(object := node2), Message := generateTestmessage(name := testname, msg := 'containsObject(2) failed for existing node'));
+	ASSERTTRUE(Condition := tree.containsObject(object := node1), Message := generateTestmessage(name := testname, msg := 'containsObject(1) failed for existing node'));
+	//Iterate
+	tree.createNewIterator(iterator => iterator);
+	iterator.iterate(execute := FALSE);
+	iterator.iterate(execute:=TRUE,object => iterateObject);
+	ASSERTTRUE(Condition := iterateObject=node1, Message := generateTestmessage(name := testname, msg := 'iterate failed at 1 object'));
+	iterator.iterate(execute:=TRUE,object => iterateObject);
+	ASSERTTRUE(Condition := iterateObject = node2, Message := generateTestmessage(name := testname, msg := 'iterate failed at 2 object'));
+	iterator.iterate(execute:=TRUE,object => iterateObject);
+	ASSERTTRUE(Condition := iterateObject = node3, Message := generateTestmessage(name := testname, msg := 'iterate failed at 3 object'));
+	iterator.iterate(execute:=TRUE,object => iterateObject);
+	ASSERTTRUE(Condition := iterateObject = node4, Message := generateTestmessage(name := testname, msg := 'iterate failed at 4 object'));
+	iterator.iterate(execute:=TRUE,object => iterateObject);
+	ASSERTTRUE(Condition := iterateObject = node10, Message := generateTestmessage(name := testname, msg := 'iterate failed at 5 object'));
+	iterator.iterate(execute:=TRUE,object => iterateObject);
+	ASSERTTRUE(Condition := iterateObject = node15, Message := generateTestmessage(name := testname, msg := 'iterate failed at 6 object'));
+	iterator.iterate(execute:=TRUE,object => iterateObject);
+	ASSERTTRUE(Condition := iterateObject = node17, Message := generateTestmessage(name := testname, msg := 'iterate failed at 7 object'));
+	iterator.iterate(execute:=TRUE,object => iterateObject);
+	ASSERTTRUE(Condition := iterateObject = node20, Message := generateTestmessage(name := testname, msg := 'iterate failed at 8 object'));      
+	iterator.iterate(execute := FALSE); 
+	Test_FINISHED();
+	//clear tree to free memory captured from nodecontainers
+	tree.clear();
+	//clear nodecontent
+	iterator.destruct();
+	node10.destruct();
+	node20.destruct();
+	node4.destruct();
+	node15.destruct();
+	node17.destruct();
+	node3.destruct();
+	node2.destruct();
+	node1.destruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="nodesAreInCorrectOrderWithReverseOrderComparator" Id="{fa18e113-2ef0-4181-81fa-7910b5eeef38}">
+      <Declaration><![CDATA[METHOD nodesAreInCorrectOrderWithReverseOrderComparator
+VAR_INPUT
+	(*unique Identifier for each instance to differentiate between multiple instances*)
+	testInstanceIdentifier 	:Tc2_System.T_MaxString;
+	(*The comparator that should be used for the test*)
+END_VAR
+VAR
+	comparator						:CNM_CollectionTestLib.ReverseOrderComparator;
+	tree 							:TreeTestClass(comparator);
+	testname 						:Tc2_System.T_MaxString;
+	nodes 							:ARRAY[0..99] OF CNM_AbstractObject.IObject;
+	index 							:INT;
+	successfulPass					:BOOL	:= TRUE;
+	validityCheckObject				:CNM_AbstractObject.IObject;
+	isCorrectlyOrdered				:BOOL	:= FALSE;
+	leftChildsCurrentNode			:CNM_CollectionInterfaces.IBinaryTreeNode;
+	rightChildsCurrentNode			:CNM_CollectionInterfaces.IBinaryTreeNode;
+	leftChildsCurrentNodeObject		:POINTER TO CNM_CollectionTestLib.TestObject;
+	leftChildNodeObject				:POINTER TO CNM_CollectionTestLib.TestObject;
+	rightChildsCurrentNodeObject	:POINTER TO CNM_CollectionTestLib.TestObject;
+	rightChildNodeObject			:POINTER TO CNM_CollectionTestLib.TestObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[testname := CONCAT('nodesAreInCorrectOrderWithReverseOrderComparator', testInstanceIdentifier);
+IF TEST_ORDERED(testname) THEN 
+	validityCheckObject := testobjectfactory.getNewTestObject(1);
+	successfulPass := TRUE;
+	
+	FOR index := 0 TO 99 BY 1 DO
+		nodes[index] := THIS^.testobjectfactory.getNewTestObject(index);
+		successfulPass := (
+			successfulPass
+			AND (tree.tree.insert(nodes[index]) = CNM_ReturnTypes.SingleExecutionResult.SUCCESS)
+		);
+		
+	END_FOR
+	
+	IF NOT successfulPass THEN
+		AssertTrue(FALSE, 'Inserting nodes to tree has failed, test couldn$'t run');
+		JMP testFinished;
+	END_IF
+	
+	isCorrectlyOrdered := checkNodeReverseOrder(tree.testRootNode, leftChildsCurrentNode, rightChildsCurrentNode);
+	
+	THIS^.AssertTrue(isCorrectlyOrdered, 'Nodes in the tree weren$'t correctly ordered');
+	
+	IF validityCheckObject.isObjectValid(leftChildsCurrentNode) THEN
+		__QUERYPOINTER(leftChildsCurrentNode.object, leftChildsCurrentNodeObject);
+		__QUERYPOINTER(leftChildsCurrentNode.leftChild.object, leftChildNodeObject);
+		THIS^.AssertTrue(
+			FALSE, 
+			Tc2_Standard.CONCAT('Left child was smaller at node ', TO_STRING(leftChildsCurrentNodeObject^.orderValue))
+		);
+		
+		THIS^.AssertTrue(
+			FALSE, 
+			Tc2_Standard.CONCAT('Left child had value ', TO_STRING(leftChildNodeObject^.orderValue))
+		);
+		
+	END_IF
+	
+	IF validityCheckObject.isObjectValid(rightChildsCurrentNode) THEN
+		__QUERYPOINTER(rightChildsCurrentNode.object, rightChildsCurrentNodeObject);
+		__QUERYPOINTER(rightChildsCurrentNode.rightChild.object, rightChildNodeObject);
+		THIS^.AssertTrue(
+			FALSE,
+			Tc2_Standard.CONCAT('Right child was greater at node ', TO_STRING(rightChildsCurrentNodeObject^.orderValue))
+		);
+		
+		THIS^.AssertTrue(
+			FALSE,
+			Tc2_Standard.CONCAT('Right child had value ', TO_STRING(rightChildNodeObject^.orderValue))
+		);
+		
+	END_IF
+	
+	testFinished:
+	tree.deepDestruct();
+	validityCheckObject.destruct();
+	TEST_FINISHED();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="removeElements" Id="{42eb1c01-9d14-4b60-bc05-91d1e162b785}">
+      <Declaration><![CDATA[(*
+
+short summary
+=================
+function to create a new balanced binary searchtree node
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+parameters
+=========================
+
+*)
+
+METHOD removeElements
+VAR_INPUT
+(*The identifier used to differentiate between mutliple instances of this test*)	
+	testInstanceIdentifier 	:STRING(255);
+END_VAR
+VAR
+	tree 					:TreeTestClass(OBJECT_NOT_REFERENCED);
+	testname				:STRING(255);
+	nodes 					:ARRAY[0..7] OF CNM_AbstractObject.IObject;
+	node17 					:CNM_AbstractObject.IObject;
+	node20 					:CNM_AbstractObject.IObject;
+	node3 					:CNM_AbstractObject.IObject;
+	node10 					:CNM_AbstractObject.IObject;
+	node15 					:CNM_AbstractObject.IObject;
+	node4 					:CNM_AbstractObject.IObject;
+	node2 					:CNM_AbstractObject.IObject;
+	node1 					:CNM_AbstractObject.IObject;
+	binaryRoot 				:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	index					:INT := 0;
+END_VAR
+VAR CONSTANT
+	NodeValues 				:ARRAY[0..7] OF INT		:= [2,1,3,10,20,4,17,15];
+	{attribute 'suppress_warning_0' := 'C0228'}
+	OBJECT_NOT_REFERENCED 	:__XWORD	:= 0;
+	{attribute 'restore_warning_0' := 'C0228'}
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[testname := CONCAT('removeElements',testInstanceIdentifier);
+IF TEST_ORDERED(testname) THEN 
+	//pre test
+	IF __QUERYINTERFACE(tree.testRootNode,binaryRoot) THEN
+		FOR index := 0 TO 7 BY 1 DO
+			nodes[index] := THIS^.testobjectfactory.getNewTestObject(NodeValues[index]);
+			tree.tree.insert(nodes[Index]);
+		END_FOR
+		node17 := nodes[0];
+		node20 := nodes[1];
+		node3 := nodes[2];
+		node10:= nodes[3];
+		node15 := nodes[4];
+		node4 := nodes[5];
+		node2 := nodes[6];
+		node1 := nodes[7];
+
+		//test remove nodes and check after removing them that tree is correct (element is missing / rotation etc was correct 
+		ASSERTTRUE(Condition := tree.tree.remove(node20)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, Message := generateTestmessage(name := testname,msg:='remove of node 20 failed'));
+		ASSERTTRUE(Condition := binaryroot.isObjectNull(binaryroot.rightChild.rightChild.rightChild), Message := generateTestmessage(name := testname, msg := 'removed leaf wasnt replaceed with null'));
+		ASSERTTRUE(Condition:= tree.tree.remove(node17)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, Message := generateTestmessage(name:=testname,msg:='remove of node(17) failed'));
+ 		ASSERTTRUE(Condition := binaryroot.rightChild.rightChild.object = node15, Message := generateTestmessage(name := testname,msg:='removed node(17) wasnt replaced by leftChild'));
+		ASSERTTRUE(Condition := tree.tree.remove(node3)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, Message := generateTestmessage(name:=testname, msg:='remove of rootnode failed'));
+		//Tree was rotatet, so get new root
+		__QUERYINTERFACE(tree.testRootNode,binaryroot);
+		ASSERTTRUE(Condition := binaryroot.object = node4, Message := generateTestmessage(name:=testname, msg:='renoved root wasnt replaced by inorder successor'));
+		ASSERTTRUE(Condition := tree.tree.remove(node10)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, Message := generateTestmessage(name:=testname,msg:='remove of rootnode.right(10) failed'));
+		ASSERTTRUE(Condition := binaryRoot.rightChild.object = node15, Message := generateTestmessage(name:=Testname,msg:='removed root.right(10) wasnt replaced with only child(15)'));
+		ASSERTTRUE(Condition := tree.tree.remove(node15)=CNM_ReturnTypes.SingleExecutionResult.SUCCESS, Message := generateTestmessage(name := testname, msg := 'remove of root.rightChild failed'));
+		//Tree was rotatet so get new root
+		__QUERYINTERFACE(tree.testRootNode,binaryroot);
+		ASSERTTRUE(Condition := binaryroot.object =  node2, Message := generateTestmessage(name := testname, msg := 'after rotation root wasnt what was expected'));
+		ASSERTTRUE(Condition := binaryroot.leftChild.object = node1, Message := generateTestmessage(name := testname, msg := 'after rotation root.left wasnt what was expected'));
+		ASSERTTRUE(Condition := binaryroot.rightChild.object = node4, Message := generateTestmessage(name := testname, msg := 'after rotation root.right wasnt what was expected'));
+		//Test Treesize
+		AssertEquals_LWORD(Expected := 3,Actual := tree.size,Message := generateTestmessage(name := testname, msg := 'treesize wasnt correct after delete'));
+		//Test contains element
+		ASSERTFALSE(Condition := tree.containsObject(node17),Message := generateTestmessage(name := testname, msg := 'containsObject(17) was true but tree hasnt 17 anymore'));
+		ASSERTFALSE(Condition := tree.containsObject(node20),Message := generateTestmessage(name := testname, msg := 'containsObject(20) was true but tree hasnt 20 anymore'));
+		ASSERTFALSE(Condition := tree.containsObject(node3),Message := generateTestmessage(name := testname, msg := 'containsObject(3) was true but tree hasnt 3 anymore'));
+		ASSERTFALSE(Condition := tree.containsObject(node10),Message := generateTestmessage(name := testname, msg := 'containsObject(10) was true but tree hasnt 10 anymore'));
+		ASSERTFALSE(Condition := tree.containsObject(node15),Message := generateTestmessage(name := testname, msg := 'containsObject(15) was true but tree hasnt 15 anymore'));
+		ASSERTTRUE(Condition := tree.containsObject(node4),Message := generateTestmessage(name := testname, msg := 'containsObject(4) was flase but tree still has it'));
+		ASSERTTRUE(Condition := tree.containsObject(node2),Message := generateTestmessage(name := testname, msg := 'containsObject(2) was flase but tree still has it'));
+		ASSERTTRUE(Condition := tree.containsObject(node1),Message := generateTestmessage(name := testname, msg := 'containsObject(1) was flase but tree still has it'));
+	
+		//clean up the objects that I removed 
+		IF tree.isObjectValid(node17) THEN
+			node17.destruct();	
+		END_IF
+		IF tree.isObjectValid(node20) THEN
+			node20.destruct();	
+		END_IF
+		IF tree.isObjectValid(node3) THEN
+			node3.destruct();	
+		END_IF
+		IF tree.isObjectValid(node10) THEN
+			node10.destruct();	
+		END_IF
+		IF tree.isObjectValid(node15) THEN
+			node15.destruct();	
+		END_IF
+		
+	END_IF
+	
+	TEST_FINISHED();
+	
+	tree.clear();
+	FOR index := 0 TO 7 BY 1 DO
+		IF tree.isObjectValid(nodes[index]) THEN
+			nodes[index].destruct();
+		END_IF
+	END_FOR
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="concretBBSTreeTest">
+      <LineId Id="147" Count="3" />
+      <LineId Id="44" Count="0" />
+    </LineIds>
+    <LineIds Name="concretBBSTreeTest.checkNodeReverseOrder">
+      <LineId Id="96" Count="30" />
+      <LineId Id="80" Count="0" />
+    </LineIds>
+    <LineIds Name="concretBBSTreeTest.FB_init">
+      <LineId Id="6" Count="0" />
+      <LineId Id="8" Count="0" />
+    </LineIds>
+    <LineIds Name="concretBBSTreeTest.generateTestmessage">
+      <LineId Id="5" Count="0" />
+      <LineId Id="11" Count="0" />
+    </LineIds>
+    <LineIds Name="concretBBSTreeTest.insertElementInEmptyTree">
+      <LineId Id="5" Count="0" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="58" Count="0" />
+      <LineId Id="15" Count="5" />
+      <LineId Id="34" Count="0" />
+      <LineId Id="21" Count="0" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="36" Count="0" />
+      <LineId Id="35" Count="0" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="48" Count="0" />
+      <LineId Id="142" Count="1" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="99" Count="0" />
+    </LineIds>
+    <LineIds Name="concretBBSTreeTest.insertElementsToCheckRotation">
+      <LineId Id="20" Count="2" />
+      <LineId Id="24" Count="1" />
+      <LineId Id="52" Count="2" />
+      <LineId Id="29" Count="0" />
+      <LineId Id="107" Count="1" />
+      <LineId Id="265" Count="2" />
+      <LineId Id="69" Count="0" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="268" Count="0" />
+      <LineId Id="58" Count="1" />
+      <LineId Id="62" Count="2" />
+      <LineId Id="61" Count="0" />
+      <LineId Id="65" Count="1" />
+      <LineId Id="70" Count="1" />
+      <LineId Id="57" Count="0" />
+      <LineId Id="31" Count="0" />
+      <LineId Id="109" Count="0" />
+      <LineId Id="117" Count="1" />
+      <LineId Id="116" Count="0" />
+      <LineId Id="111" Count="4" />
+      <LineId Id="110" Count="0" />
+      <LineId Id="119" Count="0" />
+      <LineId Id="122" Count="0" />
+      <LineId Id="121" Count="0" />
+      <LineId Id="124" Count="2" />
+      <LineId Id="123" Count="0" />
+      <LineId Id="127" Count="0" />
+      <LineId Id="120" Count="0" />
+      <LineId Id="128" Count="4" />
+      <LineId Id="46" Count="1" />
+      <LineId Id="136" Count="4" />
+      <LineId Id="135" Count="0" />
+      <LineId Id="141" Count="0" />
+      <LineId Id="143" Count="4" />
+      <LineId Id="142" Count="0" />
+      <LineId Id="148" Count="0" />
+      <LineId Id="150" Count="4" />
+      <LineId Id="149" Count="0" />
+      <LineId Id="155" Count="0" />
+      <LineId Id="157" Count="4" />
+      <LineId Id="156" Count="0" />
+      <LineId Id="162" Count="0" />
+      <LineId Id="164" Count="4" />
+      <LineId Id="163" Count="0" />
+      <LineId Id="133" Count="1" />
+      <LineId Id="188" Count="0" />
+      <LineId Id="48" Count="0" />
+      <LineId Id="190" Count="1" />
+      <LineId Id="193" Count="3" />
+      <LineId Id="192" Count="0" />
+      <LineId Id="225" Count="0" />
+      <LineId Id="217" Count="0" />
+      <LineId Id="226" Count="0" />
+      <LineId Id="218" Count="6" />
+      <LineId Id="197" Count="0" />
+      <LineId Id="474" Count="0" />
+      <LineId Id="473" Count="0" />
+      <LineId Id="230" Count="0" />
+      <LineId Id="228" Count="0" />
+      <LineId Id="231" Count="13" />
+      <LineId Id="472" Count="0" />
+      <LineId Id="227" Count="0" />
+      <LineId Id="422" Count="0" />
+      <LineId Id="84" Count="0" />
+      <LineId Id="423" Count="0" />
+      <LineId Id="475" Count="0" />
+      <LineId Id="421" Count="0" />
+      <LineId Id="365" Count="6" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="316" Count="0" />
+    </LineIds>
+    <LineIds Name="concretBBSTreeTest.nodesAreInCorrectOrderWithReverseOrderComparator">
+      <LineId Id="235" Count="26" />
+      <LineId Id="277" Count="3" />
+      <LineId Id="262" Count="0" />
+      <LineId Id="281" Count="3" />
+      <LineId Id="263" Count="5" />
+      <LineId Id="285" Count="3" />
+      <LineId Id="269" Count="0" />
+      <LineId Id="289" Count="3" />
+      <LineId Id="270" Count="6" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="concretBBSTreeTest.removeElements">
+      <LineId Id="6" Count="3" />
+      <LineId Id="195" Count="0" />
+      <LineId Id="197" Count="0" />
+      <LineId Id="199" Count="0" />
+      <LineId Id="198" Count="0" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="80" Count="0" />
+      <LineId Id="39" Count="2" />
+      <LineId Id="49" Count="0" />
+      <LineId Id="57" Count="1" />
+      <LineId Id="103" Count="0" />
+      <LineId Id="82" Count="0" />
+      <LineId Id="43" Count="0" />
+      <LineId Id="83" Count="0" />
+      <LineId Id="42" Count="0" />
+      <LineId Id="44" Count="1" />
+      <LineId Id="47" Count="0" />
+      <LineId Id="104" Count="0" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="50" Count="3" />
+      <LineId Id="105" Count="0" />
+      <LineId Id="54" Count="0" />
+      <LineId Id="59" Count="2" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="106" Count="0" />
+      <LineId Id="110" Count="7" />
+      <LineId Id="36" Count="0" />
+      <LineId Id="138" Count="0" />
+      <LineId Id="163" Count="2" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="166" Count="1" />
+      <LineId Id="140" Count="0" />
+      <LineId Id="168" Count="1" />
+      <LineId Id="141" Count="0" />
+      <LineId Id="170" Count="1" />
+      <LineId Id="142" Count="0" />
+      <LineId Id="172" Count="1" />
+      <LineId Id="143" Count="0" />
+      <LineId Id="137" Count="0" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="20" Count="0" />
+      <LineId Id="251" Count="1" />
+      <LineId Id="250" Count="0" />
+      <LineId Id="253" Count="0" />
+      <LineId Id="255" Count="1" />
+      <LineId Id="254" Count="0" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="249" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

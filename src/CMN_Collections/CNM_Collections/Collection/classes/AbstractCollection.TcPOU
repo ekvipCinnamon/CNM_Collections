@@ -1,0 +1,479 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.11">
+  <POU Name="AbstractCollection" Id="{b6c813e5-0cfd-4c7f-b9e7-e214dba5de58}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+An abstract class to implement the basic datastructure independend collection functionality for use in 
+other Collections.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+FUNCTION_BLOCK ABSTRACT AbstractCollection EXTENDS AbstractDisposableContainer IMPLEMENTS CNM_CollectionInterfaces.ICollection
+VAR
+	(*the amount of objects in the collection*)
+	collectionSize 		:UDINT;
+	(*counter that increases on every collection change*)
+	changesToCollection :__XWORD;
+END_VAR
+VAR_STAT
+	collectionFactory 	:CollectionFactory();
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="ICollection" Id="{a16029ef-2ff4-4a94-b848-b882d93f2324}" />
+    <Method Name="clear" Id="{dad0d453-984a-4301-82d0-95927ddf72b6}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method clears/deletes all clearable data from this object.
+**Example:**
+A list: 1 2 3 after ```list.clear()``` will have no remaining items, isEmpty = true.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD ABSTRACT clear
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="compareTo" Id="{f3378038-b5a2-4155-aa02-ea1eb46150e9}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method compares a foreign object with the own one, this is needed for sort orders.
+The abstract class evaluates every object that is NULL as greater, and all other objects as equal. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SMALLER``: ``THIS`` precedes in order,
+	``EQUAL``: ``THIS`` and ``object`` at the same position in order,
+	``GREATER``: ``THIS`` is after in order.
+	Checkout :``CNM_CollectionInterfaces.ComparationResult``.
+
+*)
+METHOD compareTo :CNM_ReturnTypes.ComparationResult
+VAR_INPUT
+	(*the object to be compared to*)
+	object	:CNM_CollectionInterfaces.CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	collection :CNM_CollectionInterfaces.ICollection;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (THIS^.isObjectNull(object)) THEN
+	compareTo := CNM_ReturnTypes.ComparationResult.GREATER;
+ELSE
+	compareTo := CNM_ReturnTypes.ComparationResult.EQUAL;
+	IF(__QUERYINTERFACE(object, collection)) THEN
+		IF(collection.size < THIS^.size) THEN
+			compareTo := CNM_ReturnTypes.ComparationResult.GREATER;
+		ELSIF(collection.size > THIS^.size) THEN
+			compareTo := CNM_ReturnTypes.ComparationResult.SMALLER;			
+		END_IF
+	END_IF
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="containsEqualObject" Id="{02943e39-2faf-4fb0-bc2c-a06650f5f045}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method checks if a given object is contained in the collection. 
+The object is inside if the collection contains an object where the compareTo returns EQUAL.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``FALSE``: collection does not contain an equal object
+    ``TRUE``: collection does contain an equal object
+
+*)
+
+METHOD containsEqualObject :BOOL
+VAR_INPUT
+	(*the object to be checked if it exists inside the collection*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	currentObj :CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[containsEqualObject := FALSE;
+RETURN(NOT THIS^.isObjectValid(object));
+THIS^.iterate(execute := FALSE);
+WHILE (THIS^.iterate(execute := TRUE, object => currentObj) = CNM_ReturnTypes.SingleExecutionState.BUSY) DO
+	IF (object.compareTo(currentObj) = CNM_ReturnTypes.ComparationResult.EQUAL) THEN
+		containsEqualObject := TRUE;
+		RETURN;
+	END_IF
+END_WHILE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="containsObject" Id="{7f236535-1562-4bf3-adfe-ff7347122ac5}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method checks if a given object is contained in the collection. 
+The object is inside if the collection contains an object for that isEqual retuns true.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``FALSE``: collection does not contain given object,
+    ``TRUE``: collection does contain given object
+
+*)
+
+METHOD containsObject :BOOL
+VAR_INPUT
+	(*the object to be checked if it exists inside the collection*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	currentObj :CNM_AbstractObject.IObject;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[containsObject := FALSE;
+RETURN(NOT THIS^.isObjectValid(object));
+THIS^.iterate(execute := FALSE);
+WHILE(THIS^.iterate(execute := TRUE, object => currentObj) = CNM_ReturnTypes.SingleExecutionState.BUSY)DO
+	IF(object.isEqual(currentObj))THEN
+		containsObject := TRUE;
+		RETURN;
+	END_IF
+END_WHILE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="createNewIterator" Id="{9be6dcf6-afc5-43ed-94de-aa300bedb873}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns a NEW Iterator instance which can iterate the collection.
+These iterators can be used parallel independend of each other on the same collection.
+
+**Warning:**
+The returned Iterator was created using the __NEW operator and must be destructed to avoid memory leaks!
+
+
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD ABSTRACT createNewIterator :CNM_ReturnTypes.SingleExecutionResult
+VAR_OUTPUT
+	(*The new created iterator or null if allocation fails *)
+	iterator :CNM_CollectionInterfaces.IIterator;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="forEach" Id="{432a162e-b7d2-431d-9319-9f55a8ac44d7}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns strategies to loop through the collection and apply actions to all objects contained.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY forEach :CNM_CollectionInterfaces.IForEachStrategy]]></Declaration>
+      <Get Name="Get" Id="{4709d2df-c150-4929-8fe9-7244e736590a}">
+        <Declaration><![CDATA[VAR_INST
+	executor : ForEachStrategyExecutor(THIS^);
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[forEach := executor;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="hasElement" Id="{c3dc845d-cca1-4e9c-aa00-79ed3c00f3f8}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns ``TRUE`` if the collection has any element.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY FINAL hasElement :BOOL
+]]></Declaration>
+      <Get Name="Get" Id="{02528981-ea6f-4cce-85dd-cdb26efd2175}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[hasElement := (THIS^.size > 0);
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="isEmpty" Id="{fa21d046-efbb-4a43-b883-33fbbaf0ad13}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns ``TRUE`` if the collection is empty.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY FINAL isEmpty :BOOL
+]]></Declaration>
+      <Get Name="Get" Id="{882efde0-fdb6-4053-a2b7-3f5964a01618}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[isEmpty := (THIS^.size = 0);
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="iterate" Id="{ce2a167a-d12a-48f5-82b2-86d0c090fadd}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns the next object in the iteration and returns an execution state.
+**Example:**
+You have a list: 1 2 3
+the first iterate call will return CNM_ReturnTypes.BUSY and object = 1
+the second iterate call will return CNM_ReturnTypes.BUSY and object = 2
+the third iterate call will return CNM_ReturnTypes.BUSY and object = 3
+the fourth iterate call will return CNM_ReturnTypes.SUCCESS and object = null;
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if last object from collection was already returned,
+    ``ABORTED``: execute has a falling edge during iterate,
+    ``BUSY``: When iterate had rising edge on execute and not all objects had been returned yet,
+    ``IDLE``: iterate wasn't started yet,
+	``ERROR``: error occured during iteration 
+
+*)
+
+METHOD PROTECTED ABSTRACT iterate :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*Indicates if the iteration should be executed or resetted*) 
+	execute	:BOOL;
+END_VAR
+VAR_OUTPUT
+	(*The current Object of the Iteration*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="size" Id="{e09d5f2c-d2e7-46ef-b11c-13f08f43954a}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns the number of elements inside this collection.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY FINAL size :UDINT
+]]></Declaration>
+      <Get Name="Get" Id="{44455386-ce2b-4b38-9e44-5dad40076d4f}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[size := THIS^.collectionSize;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="AbstractCollection">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractCollection.clear">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractCollection.compareTo">
+      <LineId Id="1" Count="12" />
+    </LineIds>
+    <LineIds Name="AbstractCollection.containsEqualObject">
+      <LineId Id="16" Count="0" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="1" Count="7" />
+      <LineId Id="10" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractCollection.containsObject">
+      <LineId Id="10" Count="1" />
+      <LineId Id="1" Count="6" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractCollection.createNewIterator">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractCollection.forEach.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractCollection.hasElement.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractCollection.isEmpty.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractCollection.iterate">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractCollection.size.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,261 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="AbstractLinkedListSorter" Id="{ed2ade21-c0e7-456d-9d0c-14cc49bf2871}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Abstract base class for LinkedListSorters.
+Handles the head and last properties as well as the clone.
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+FUNCTION_BLOCK INTERNAL ABSTRACT AbstractLinkedListSorter EXTENDS AbstractListSorter IMPLEMENTS CNM_CollectionInterfaces.ILinkedListSorter
+VAR
+	sorterHead :CNM_CollectionInterfaces.IDoublyLinkedElement;
+	sorterLast :CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="ILinkedListSorter" Id="{f4da1a23-e055-439b-860e-188ef81493b8}" />
+    <Method Name="instantInverseSort" Id="{8e73b881-2ace-4c43-90dd-d3a3f27440a6}" FolderPath="ILinkedListSorter\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure instantly in descending order within one call. 
+Uses the passed Comparator or the compareTo of the contained Objects if no comparator is passed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``ERROR``: Sort was not able to finish 
+	``SUCCESS``: Sorting was finished succesfully
+
+*)
+METHOD instantInverseSort : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The size of the list to be sorted*)
+	size	: UDINT;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*The first element in the list, must be set on every call to current head of list.*)
+	head	: CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*The last element of the list after sorting, may be useful for doublelinked structures*)
+	last	: CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion	: __XWORD;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.reverseComparator.attachComparator(comparator);
+THIS^.instantSort(
+	size := size,
+	comparator := THIS^.reverseComparator,
+	head := head,
+	last := last,
+	currentListVersion := currentListVersion
+);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantSort" Id="{571e785f-e6e3-4ead-ba69-4d889ac98a3c}" FolderPath="ILinkedListSorter\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure instantly within one call. 
+Uses the passed Comparator or the compareTo of the contained Objects if no comparator is passed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``ERROR``: Sort was not able to finish 
+	``SUCCESS``: Sorting was finished succesfully
+
+*)
+METHOD ABSTRACT instantSort : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The size of the list to be sorted*)
+	size	: UDINT;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*The first element in the list, must be set on every call to current head of list.*)
+	head	: CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*The last element of the list after sorting, may be useful for doublelinked structures*)
+	last	: CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion	: __XWORD;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="inverseSort" Id="{f774ed75-382f-43c5-ba3d-4283c390b960}" FolderPath="ILinkedListSorter\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the Sortable in the inverted order, so from great to low
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``ABORTED``: While inverse was pending,execute had a falling edge,
+	``BUSY``: Inverse is in progress
+	``ERROR``: Inverse was not able to finish (p.e. List changed) call inverse(false) to reset
+	``IDLE``: Currently invert is not in progress
+	``SUCCESS``: Inversing was finished 
+*)
+
+METHOD inverseSort :CNM_ReturnTypes.SingleExecutionState;
+VAR_INPUT
+	(*control bit to start or abort the inverting, needs to be active until the ExecutionState is noz longer busy*)
+	execute	:BOOL;
+	(*The size of the list to be sorted*)
+	size :UDINT;
+END_VAR
+VAR_INPUT
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator :CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*The first element in the list, must be set on every call to current head of list.*)
+	head :CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*The last element of the list after sorting, may be useful for doublelinked structures*)
+	last :CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion :__XWORD;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.reverseComparator.attachComparator(comparator);
+THIS^.sort(
+	execute := execute,
+	size := size,
+	comparator := THIS^.reverseComparator,
+	head := head,
+	last := last,
+	currentListVersion := currentListVersion
+);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="sort" Id="{85d682a0-0fae-4aa2-a8a3-265c1f1ca69e}" FolderPath="ILinkedListSorter\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure. 
+This can take many cycles and should be called until the CNM_ReturnTypes.ExecutionState is no longer ``BUSY``.
+Call with execute := FALSE to initialize before sort.
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``ABORTED``: While sort was pending,execute had a falling edge,
+	``BUSY``: Sort is in progress
+	``ERROR``: Sort was not able to finish (p.e. List changed) call sort(false) to reset
+	``IDLE``: Currently no sort in progress
+	``SUCCESS``: Sorting was finished 
+
+*)
+
+METHOD ABSTRACT sort :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*control bit to start or abort the sorting, needs to be active until the ExecutionState is SUCCESS*)
+	execute	:BOOL;
+	(*The size of the list to be sorted*)
+	size :UDINT;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator :CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*The first element in the list, must be set on every call to current head of list.*)
+	head :CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*The last element of the list after sorting, may be useful for doublelinked structures*)
+	last :CNM_CollectionInterfaces.IDoublyLinkedElement;
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion :__XWORD;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="AbstractLinkedListSorter">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractLinkedListSorter.instantInverseSort">
+      <LineId Id="1" Count="8" />
+    </LineIds>
+    <LineIds Name="AbstractLinkedListSorter.instantSort">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractLinkedListSorter.inverseSort">
+      <LineId Id="1" Count="6" />
+      <LineId Id="9" Count="1" />
+      <LineId Id="8" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractLinkedListSorter.sort">
+      <LineId Id="7" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

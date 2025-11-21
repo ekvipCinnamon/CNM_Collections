@@ -1,0 +1,481 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="ChainedApplier" Id="{475b86dd-c913-4104-90a1-fe2eb2acab50}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+An abstract class to implement the logic of Appliers for forEach. Users only need to implement apply in inherited class and should not change any other method.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK FINAL ChainedApplier EXTENDS AbstractDisposableContainer IMPLEMENTS CNM_CollectionInterfaces.IChainedApplier
+VAR
+	object :CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	myactions			:ApplierList();
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="accept" Id="{72e3ee52-2af5-46f2-abf4-9e07c567549e}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Method to accept an object.
+**Example:**
+```
+NumberIncrementer.accept(Number);
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD accept : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*object to accept*)
+	object	: CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF(THIS^.isObjectValid(object))THEN
+	THIS^.object := object;
+	accept := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+ELSE
+	accept := CNM_ReturnTypes.SingleExecutionResult.ERROR;	
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="actions" Id="{ccc9aa13-dde6-4c56-99e0-7c97e03be880}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns a list of actions/operations performed by this applier.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY actions :CNM_CollectionInterfaces.IApplierList
+]]></Declaration>
+      <Get Name="Get" Id="{6c26efa6-6bc0-40fe-bda1-d5e517267dd4}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[actions := THIS^.myactions;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="andThen" Id="{b56c9d43-db0c-4100-9e28-9369c63ead0e}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Method to concat actions perfomed on an object. This way two (or more) Actions can be performed on data with one foreach.
+All concatinated appliers can be cleared with THIS^.clear();
+**Example:**
+You want to double your numbers and then increment them, you would write:
+```
+ConcreteDoubleApplier.andThen(ConcreteIncrementApplier);
+```
+If you have a list with 1 2 3, after a forEach with this Applier the list will be transformed to: 3 5 7.
+
+**Warning:**
+    It is possible to create infinite loops using andThen. For example: A1.andThen(A2).andThen(A1)
+	The program will go into unknown behaviour if this occurs and the foreach call may or may not work as you intended.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``THIS^`` `IApplier`
+
+*)
+
+METHOD FINAL andThen :CNM_CollectionInterfaces.IChainedApplier
+VAR_INPUT
+	(*the applier to be used on each object*)
+	applier			:CNM_CollectionInterfaces.IApplier;
+END_VAR
+VAR
+	chained 		:CNM_CollectionInterfaces.IChainedApplier;
+	clonedActions	:CNM_CollectionInterfaces.ICollection;
+	cloneObj 		:CNM_AbstractObject.IObject;
+	pList 			:POINTER TO ApplierList;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF(THIS^.isObjectValid(applier) AND_THEN THIS^.isObjectValid(THIS^.myactions))THEN
+	IF __QUERYINTERFACE(applier, chained) THEN
+		IF (chained.actions.count > 1) THEN
+			IF(NOT THIS^.isEqual(applier))THEN
+				__QUERYPOINTER(chained.actions, pList);
+				THIS^.myactions.addAppliers(pList^.list);
+			ELSE
+				IF(THIS^.myactions.list.clone(clonedObject => cloneObj) = CNM_ReturnTypes.CloneResult.SUCCESS)THEN
+					IF( __QUERYINTERFACE(cloneObj, clonedActions))THEN
+						THIS^.myactions.addAppliers(clonedActions);					
+					END_IF
+					clonedActions.destruct();
+				END_IF
+			END_IF
+		END_IF
+	ELSE
+		THIS^.myactions.addApplier(applier);				
+	END_IF
+END_IF
+
+andThen := THIS^;
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="apply" Id="{9cb8bbe2-818a-46d1-88b6-55b9fd1deec4}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+A method to apply the concrete action on the given object (THIS^.object)
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** CNM_ReturnTypes.SingleExecutionState
+
+*)
+
+METHOD FINAL apply :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*control bit to start or abort the application, should to be active until the CNM_ReturnTypes.SingleExecutionState is SUCCESS*)
+	execute	:BOOL;
+END_VAR
+VAR_INST
+	iterator 		:ForwardArrayListIterator(0);
+	lastExecute 	:BOOL;
+	step 			:USINT;
+	returnState 	:CNM_ReturnTypes.SingleExecutionState;
+	currentApplier 	:CNM_CollectionInterfaces.IApplier;
+	cycleManager 	:CNM_CycleManager.SimpleCycleManager;
+END_VAR
+VAR
+	listToAttach	:POINTER TO ArrayList;
+	listReference	:REFERENCE TO ArrayList;
+END_VAR
+VAR CONSTANT
+	INIT :DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	RUN  :DINT := INIT + 1;
+	GET_APPLIER :DINT := RUN + 1;
+	SUCCESS :DINT := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS;
+	ERROR :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+	
+	STEP_IDLE :USINT := 0;
+	STEP_INIT :USINT := 1;
+	STEP_RUN :USINT := 2;
+	STEP_DONE :USINT := 3;
+	STEP_ERROR :USINT := 4;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[cycleManager(execute := execute);
+
+CASE cycleManager.step.current OF
+INIT:
+	cycleManager.configuration.sequence.requireSuccessStep := FALSE;
+	__QUERYPOINTER(THIS^.myactions.list, listToAttach);
+	listReference REF= listToAttach^;
+	iterator.attachArrayList(listReference);
+	iterator.reset();
+	IF(iterator.moveNext() AND_THEN __QUERYINTERFACE(iterator.current, currentApplier))THEN
+		currentApplier.accept(THIS^.object);
+		currentApplier.apply(FALSE);
+		currentApplier.apply(TRUE);
+		cycleManager.proceed();
+	ELSE
+		cycleManager.proceedWith(SUCCESS);
+	END_IF
+	
+RUN:
+	CASE currentApplier.apply(TRUE) OF
+	CNM_ReturnTypes.SingleExecutionState.SUCCESS:	
+		cycleManager.proceed();
+	CNM_ReturnTypes.SingleExecutionState.ABORTED,
+	CNM_ReturnTypes.SingleExecutionState.ERROR:
+		cycleManager.proceedWith(ERROR);
+	ELSE
+		;// do nothing, stay in RUN
+	END_CASE
+	
+GET_APPLIER:
+	IF(iterator.moveNext() AND_THEN __QUERYINTERFACE(iterator.current, currentApplier))THEN
+		currentApplier.accept(THIS^.object);
+		currentApplier.apply(FALSE);
+		currentApplier.apply(TRUE);
+		cycleManager.proceedWith(RUN);
+	ELSE
+		cycleManager.proceedWith(SUCCESS);
+	END_IF
+	
+END_CASE
+
+apply := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{aabc3365-91b4-4e11-8fac-0c89cc267dd2}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY className :CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{3529de1a-6ff8-4194-99b5-571f3cc6aad0}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'ChainedApplier';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clearContents" Id="{7548024b-e8b3-421e-889d-712aca2a6771}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD PROTECTED clearContents
+VAR CONSTANT
+	NULL	: __XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.object := NULL;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Exit" Id="{8d26639f-f801-40ef-b70d-cfa1e8810724}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it staiys in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectValid(THIS^.object) THEN
+	THIS^.object.deepDestruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{c98d5a8d-daf6-48e5-a59b-cc99f78c9edd}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The constructor ``FB_init`` is needed to create an unique hash code.
+The hash code is a pseudo random number create with a [xorshift](https://en.wikipedia.org/wiki/Xorshift) algorithm.
+It can be overwritten on derivations, because it will be called implicit, ``SUPER^.FB_init()`` is not required.
+For more information check: [Behavoir with derived function blocks](https://infosys.beckhoff.com/content/1033/tc3_plc_intro/5482088715.html?id=6983869892358031022).
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD FB_init : BOOL
+VAR_INPUT
+	(* if TRUE, the retain variables are initialized (warm start / cold start)*)
+	bInitRetains	: BOOL;
+	(* if TRUE, the instance afterwards gets moved into the copy code (online change) *)
+	bInCopyCode	: BOOL;
+	firstApplier :CNM_CollectionInterfaces.IApplier;
+	secondApplier :CNM_CollectionInterfaces.IApplier;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.myactions.clear();
+THIS^.myactions.addApplier(firstApplier);
+THIS^.myactions.addApplier(secondApplier);
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="ChainedApplier">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="ChainedApplier.accept">
+      <LineId Id="1" Count="5" />
+    </LineIds>
+    <LineIds Name="ChainedApplier.actions.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ChainedApplier.andThen">
+      <LineId Id="1" Count="0" />
+      <LineId Id="23" Count="1" />
+      <LineId Id="27" Count="9" />
+      <LineId Id="25" Count="1" />
+      <LineId Id="13" Count="3" />
+      <LineId Id="19" Count="0" />
+      <LineId Id="17" Count="0" />
+      <LineId Id="20" Count="1" />
+    </LineIds>
+    <LineIds Name="ChainedApplier.apply">
+      <LineId Id="91" Count="2" />
+      <LineId Id="95" Count="0" />
+      <LineId Id="115" Count="0" />
+      <LineId Id="98" Count="2" />
+      <LineId Id="97" Count="0" />
+      <LineId Id="108" Count="6" />
+      <LineId Id="107" Count="0" />
+      <LineId Id="140" Count="0" />
+      <LineId Id="116" Count="0" />
+      <LineId Id="130" Count="1" />
+      <LineId Id="133" Count="5" />
+      <LineId Id="132" Count="0" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="119" Count="0" />
+      <LineId Id="122" Count="3" />
+      <LineId Id="129" Count="0" />
+      <LineId Id="127" Count="0" />
+      <LineId Id="121" Count="0" />
+      <LineId Id="128" Count="0" />
+      <LineId Id="120" Count="0" />
+      <LineId Id="96" Count="0" />
+      <LineId Id="141" Count="1" />
+      <LineId Id="38" Count="0" />
+    </LineIds>
+    <LineIds Name="ChainedApplier.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ChainedApplier.clearContents">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ChainedApplier.FB_Exit">
+      <LineId Id="1" Count="3" />
+    </LineIds>
+    <LineIds Name="ChainedApplier.FB_init">
+      <LineId Id="1" Count="3" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

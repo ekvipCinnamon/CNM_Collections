@@ -1,0 +1,3733 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="BalancedBinarySearchTree" Id="{b8e7a4f4-d212-4ade-9bbc-15484453db63}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Interface for a balanced, binary, search tree
+
+- balanced means that every node has a balanced (see ``Tree_Balance``)
+- binary means that every node has two childs (they can be null)
+- search means it is a set, every object can be only contained once
+
+**Attention:**
+	search not only means you can't store an object with the same hash only once, instead it means you can only one element with this comparevalue.
+	So if you compare elements by size and you have five diffrent objects with the same size, only one of them can be stored
+	
+**Warning:**
+	Calling __DELETE directly on a Collection will bypass the destruct Context and therefore also delete the contained elements.
+	Do not change the compare value of objects while they are in the tree, doing so will destroy your tree which can lead to not finding elements, 
+	hurt of search and balanced properties and os on. If you have to alter the value the correct way is:
+	remove from tree, alter, insert. Same applies for foreach / iterate do not perform any operations changing the comparevalue
+	
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK BalancedBinarySearchTree EXTENDS AbstractCollection IMPLEMENTS CNM_CollectionInterfaces.IBalancedBinarySearchTree, ISetHelper, ITreeHelper
+VAR
+	rootNode 			:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	nodeComparator		:CNM_AbstractObject.IComparator;
+	(*nodestack used for iterate, placed in instance to be able to destroy it on destruct*)
+	nodestack			:POINTER TO CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	(* set iterator for subtract *)
+	subtractIterator	:CNM_CollectionInterfaces.IIterator;
+	(* collection iterator for insertCollection *)
+	insertIterator		:CNM_CollectionInterfaces.IIterator;
+	(* set iterator for intersect *)
+	intersectIterator 	:CNM_CollectionInterfaces.IIterator;
+	(* the amount of compare operations per cycle *)
+	upperCompareBound :UDINT := GeneralParameters.DEFAULT_OPERATIONS_PER_CYCLE;
+	(* insert buffer to roll back inserted Objects in error case *)
+	insertBuffer :POINTER TO CNM_AbstractObject.IObject;
+	(* intersect tree *)
+	intersectedTree :POINTER TO BalancedBinarySearchTree;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="ICollection" Id="{020f3a6f-0bfb-45b8-af00-9a3383bb2a3b}" />
+    <Folder Name="ISearchTree" Id="{4909f015-03d5-49ac-929c-896e9668480a}" />
+    <Folder Name="ISet" Id="{f037e030-d31c-4105-9f29-45224ec61442}">
+      <Folder Name="internal" Id="{fa668543-9753-40e7-abff-706968593ea0}">
+        <Folder Name="instant" Id="{1cacb993-5219-4235-b396-b2a4b3d6188b}" />
+      </Folder>
+    </Folder>
+    <Folder Name="ITree" Id="{50ddc3ea-53dc-45c8-80cf-0c08e4532ccf}">
+      <Folder Name="Internal" Id="{1df40c96-08e0-4891-a231-5c11bdc50d9f}">
+        <Folder Name="instant" Id="{9c1d0a08-d73a-4c0e-8361-d44807b93824}" />
+      </Folder>
+    </Folder>
+    <Folder Name="Object" Id="{05eee4e6-24c8-4f24-b786-a6a665fd0b84}" />
+    <Folder Name="Private" Id="{64ae0741-256c-4570-a416-d3188f511f2a}" />
+    <Folder Name="Protected" Id="{796d2c62-e17e-45c0-a947-b1a1f8f5c96b}" />
+    <Method Name="adaptBalanceAfterDoubleRotation" Id="{49b6e313-1488-4217-bd42-0a00a2e41d80}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+after a double rotation balance have to be adopted
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED adaptBalanceAfterDoubleRotation
+VAR_INPUT
+	(*the element for that childs balance should be adapted*)
+	elem		:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR 
+	leftChild	:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	rightChild	:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[__QUERYINTERFACE(elem.leftChild,leftChild);
+__QUERYINTERFACE(elem.rightChild,rightChild);
+
+CASE elem.balance OF 
+	CNM_CollectionInterfaces.TreeBalance.LEFTDEEPER:
+		leftChild.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+		rightChild.balance := CNM_CollectionInterfaces.TreeBalance.RIGHTDEEPER;
+	CNM_CollectionInterfaces.TreeBalance.RIGHTDEEPER:
+		leftChild.balance := CNM_CollectionInterfaces.TreeBalance.LEFTDEEPER;
+		rightChild.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+	CNM_CollectionInterfaces.TreeBalance.EQUALDEEP:
+		leftChild.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+		rightChild.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+	
+END_CASE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="announceChange" Id="{00a4ae14-2f01-496f-8f00-ba3e8a1f21c6}" FolderPath="Protected\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+called every time the tree changes, can be used to notify components
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD PROTECTED announceChange
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.changesToCollection := THIS^.changesToCollection + 1;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="checkLeftRotation" Id="{f2643437-6b2c-4218-820f-dc42dd385b6d}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+check if a leftrotation is neccesary (=> is right subtree to deep?), if necessary it is performed
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** returns the new root of the subtree, that replaces the node for that the rotation was checked
+ 
+*)
+
+METHOD PROTECTED checkLeftRotation :CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+VAR_INPUT
+	(*The element for that the rotation should be checked*)
+	elem				:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	(*indicates if method was called in context of remove (then true) or in context of insert (then false) *)
+	removing				:BOOL := FALSE;
+END_VAR
+VAR_IN_OUT
+	(*signals if the height of any subtree has changed*)
+	heightNotChanged	:BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF heightNotChanged THEN 
+	checkLeftRotation := elem;
+	RETURN;
+ELSE
+	CASE elem.balance OF
+		CNM_CollectionInterfaces.TreeBalance.EQUALDEEP:
+			elem.balance := CNM_CollectionInterfaces.TreeBalance.RIGHTDEEPER;
+			heightNotChanged := removing;
+			checkLeftRotation := elem;
+			RETURN;
+		CNM_CollectionInterfaces.TreeBalance.LEFTDEEPER:
+			elem.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+			heightNotChanged := NOT removing;
+			checkLeftRotation := elem;
+			RETURN;
+		CNM_CollectionInterfaces.TreeBalance.RIGHTDEEPER:
+			checkLeftRotation := reorganizeLeftRotate(elem := elem, heightNotChanged := heightNotChanged, removing := removing);
+			RETURN;
+	END_CASE
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="checkRightRotation" Id="{bfa2b659-34f6-4b22-81d3-dfe423009108}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+check if a rightrotation is neccesary (=> is left subtree to deep?), if necessary it is performed
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** the new root of the subtree, that replaces the node the rotation was checked for
+
+*)
+
+METHOD PROTECTED checkRightRotation :CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+VAR_INPUT
+	(*The root of the subtree that should be checked for rotation*)
+	elem 				:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	(*indicates if method was called in context of remove (then true) or in context of insert (then false) *)
+	removing				:BOOL	:= FALSE;
+END_VAR
+VAR_IN_OUT
+	(*signals if the height of any subtree changed *)
+	heightNotChanged 	:BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF heightNotChanged THEN 
+	checkRightRotation := elem;
+	RETURN;
+ELSE
+	CASE elem.balance OF 
+		CNM_CollectionInterfaces.TreeBalance.EQUALDEEP:
+			elem.balance := CNM_CollectionInterfaces.TreeBalance.LEFTDEEPER;
+			heightNotChanged := removing;
+			checkRightRotation := elem;
+			RETURN;
+		CNM_CollectionInterfaces.TreeBalance.RIGHTDEEPER:
+			elem.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+			heightNotChanged := NOT removing;
+			checkRightRotation := elem;
+			RETURN;
+		CNM_CollectionInterfaces.TreeBalance.LEFTDEEPER:
+			checkRightRotation := THIS^.reorganizeRightRotate(elem := elem, heightNotChanged := heightNotChanged, removing := removing);
+			RETURN;
+	END_CASE
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{c219e29a-ab52-41c5-b6a6-df5a56b18fd1}" FolderPath="Object\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className :CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{1c34ecf9-e0ae-48eb-9ba2-4e8c6b37e791}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.BalancedBinarySearchTree';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clear" Id="{c88e246f-c875-44f1-8c4c-77afc997aa85}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method clears/deletes all clearable data from this object.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD clear
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED	:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.announceChange();
+THIS^.destructNodeAndAllChilds(node := THIS^.rootNode, FALSE);
+THIS^.rootNode := OBJECT_NOT_REFERENCED;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clearContents" Id="{dda9ebb7-535b-48ad-aee9-d980e79249d2}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD PROTECTED clearContents
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.clear();
+THIS^.nodeComparator := 0;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clone" Id="{ecb61357-eef2-40b2-835b-0a2f6f04f32d}" FolderPath="Object\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are not cloned for this there is the method ``ICloneable.deepClone``.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+	``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+	``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support cloning
+
+*)
+METHOD clone :CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject :CNM_AbstractObject.IObject;
+END_VAR
+VAR 
+	newBalancedBinarySearchTree :POINTER TO BalancedBinarySearchTree;
+	newRootObject :CNM_AbstractObject.IObject;
+	newRoot : CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED 		:__XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[clone := THIS^.getClonedEmptyTree(deepCloned := FALSE,newBalancedBinarySearchTree => newBalancedBinarySearchTree);
+clonedObject := OBJECT_NOT_REFERENCED;
+IF (clone = CNM_ReturnTypes.CloneResult.SUCCESS) THEN
+	IF (THIS^.size > 0) THEN
+		clone := THIS^.root.clone(clonedObject => newRootObject);
+		IF clone = CNM_ReturnTypes.CloneResult.SUCCESS THEN
+			__QUERYINTERFACE(newRootObject,newRoot);
+			newBalancedBinarySearchTree^.root := newRoot;
+			newBalancedBinarySearchTree^.size := THIS^.size;
+		ELSE
+			newBalancedBinarySearchTree^.destruct();
+			RETURN;
+		END_IF	
+	END_IF
+	clonedObject := newBalancedBinarySearchTree^;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="compareNodes" Id="{414cd5f5-20d0-41e4-96ce-2718689fa4ef}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+compares two objects (should be nodevalues, or values to be inserted), uses the comparator set with method ``setNodeComparator``
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SMALLER``: ``object1`` precedes in order,
+	``EQUAL``: ``object1`` and ``object2`` at the same position in order,
+	``GREATER``: ``object1`` is after in order. Checkout the library CNM_ReturnTypes.
+
+*)
+
+METHOD PROTECTED compareNodes :CNM_ReturnTypes.ComparationResult
+VAR_INPUT
+	(*first object to compare*)
+	object1 :CNM_AbstractObject.IObject;
+	(*second object to compare*)
+	object2 :CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectNull(THIS^.nodeComparator) THEN
+	compareNodes := object1.compareTo(object2);
+ELSE
+	compareNodes := THIS^.nodeComparator.compare(object1,object2);
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="compareTo" Id="{7c25dac0-bace-40c5-b25e-b8bc5847d256}" FolderPath="Object\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method compares a foreign object with the own one, this is needed for sort orders.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SMALLER``: ``THIS`` precedes in order,
+	``EQUAL``: ``THIS`` and ``object`` at the same position in order,
+	``GREATER``: ``THIS`` is after in order.
+
+*)
+METHOD compareTo :CNM_AbstractObject.CNM_ReturnTypes.ComparationResult
+VAR_INPUT
+	(* foreign object to compare*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	treeToCompare :POINTER TO BalancedBinarySearchTree;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectValid(object) AND_THEN __QUERYPOINTER(object,treeToCompare) THEN
+	IF (THIS^.size > 0) THEN 
+		compareTo := THIS^.rootNode.compareTo(treeToCompare^.root);
+	ELSIF (treeToCompare^.size = 0) THEN
+		compareTo := CNM_ReturnTypes.ComparationResult.EQUAL;
+	ELSE
+		compareTo := CNM_ReturnTypes.ComparationResult.SMALLER;
+	END_IF
+ELSIF THIS^.isObjectNull(object) THEN
+	compareTo := CNM_ReturnTypes.ComparationResult.GREATER;
+ELSE
+	compareTo := CNM_ReturnTypes.ComparationResult.EQUAL;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="containsEqualObject" Id="{ab37a315-5878-4d51-9f69-b318f78b589b}" FolderPath="ICollection\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+True if the tree contains any object where either the injected comparator or, if no comparator is used, the object.compareTo 
+result is equal.
+
+**Attention:**
+	The objects can be different as long as comparesTo says they are equal, the hashcode is not considered. 
+To check for same Object, use containsObject
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``TRUE`` if an object is found for that .compareTo is equal, 
+	``FALSE`` otherwise
+
+*)
+
+METHOD containsEqualObject :BOOL
+VAR_INPUT
+	(*the object to be checked if an object with equal value exists inside the collection*)
+	object			:CNM_AbstractObject.IObject;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[containsEqualObject := THIS^.getEqualObject(object); 
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="containsObject" Id="{231ff0f2-1263-4504-8bc8-d6348b6fe17a}" FolderPath="ICollection\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method checks if a given object is contained in the collection.
+Overwrite default implementation to use the advantages of balanced trees
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``FALSE``: list does not contain given object
+	``TRUE``: list does contain given object
+
+*)
+
+METHOD containsObject :BOOL
+VAR_INPUT
+	(*the object to be checked if it exists inside the collection*)
+	object			:CNM_AbstractObject.IObject;
+END_VAR
+VAR 
+	currentElement	:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[currentElement := THIS^.rootnode;
+IF THIS^.isObjectNull(currentElement) OR THIS^.isObjectNull(object) THEN
+	containsObject := FALSE;
+	RETURN;
+END_IF
+containsObject := object.isEqual(currentElement.object);
+WHILE NOT containsObject DO
+	CASE THIS^.compareNodes(object,currentelement.object) OF
+		CNM_ReturnTypes.ComparationResult.GREATER:
+			IF THIS^.isObjectValid(currentElement.rightChild) THEN 
+				currentElement := currentElement.rightChild;
+			ELSE	
+				RETURN;
+			END_IF
+		CNM_ReturnTypes.ComparationResult.SMALLER:
+			IF THIS^.isObjectValid(currentElement.leftChild) THEN
+				currentElement := currentElement.leftChild;
+			ELSE
+				RETURN;
+			END_IF
+		ELSE
+			// if reached, the node comparator founds both objects equal but object.isEqual not
+			RETURN;
+	END_CASE
+	containsObject := object.isEqual(currentElement.object);
+END_WHILE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="createNewIterator" Id="{67db2b4a-f3e6-4878-a95e-90f45c7e4c33}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns a NEW Iterator instance which can iterate the collection.
+These iterators can be used parallel independend of each other on the same collection.
+
+**Warning:**
+The returned Iterator was created using the __NEW operator and must be destructed to avoid memory leaks!
+
+
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD createNewIterator : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_OUTPUT
+	(*The new created iterator or null if allocation fails *)
+	iterator	: CNM_CollectionInterfaces.IIterator;
+END_VAR
+VAR
+	newIterator :POINTER TO InorderBBSTIterator;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[newIterator := __NEW(InorderBBSTIterator(tree := THIS^));
+IF (newIterator = 0) THEN
+	createNewIterator := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	RETURN;
+END_IF
+createNewIterator := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+__QUERYINTERFACE(newIterator^, iterator);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="dec" Id="{a88f3507-1ce0-4848-88fe-ae9bc59ccc0c}" FolderPath="Private\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Method to decrease \_\_XWORD without overflow
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD PRIVATE dec
+VAR_IN_OUT
+	(*value to decrease*)
+	value 		:__XWORD;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[value := SEL(value = 0, value - 1 , 0);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="decrementSize" Id="{2c2705e7-04cb-4d59-a3ba-a2a62d074c7d}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+decrements the size of the collection
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED decrementSize
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.collectionSize := THIS^.collectionSize-1;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="deepClone" Id="{732b808f-dced-4706-9c8c-ea29622eb771}" FolderPath="Object\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are cloned too.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+If something goes wrong, then this method must clean up everything
+that has been cloned and free the memory again.
+**The deepClone either works completely, or not at all**
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+	``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+	``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support deep cloning
+
+*)
+METHOD deepClone :CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject	:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	newTreeObject 	:CNM_AbstractObject.IObject;
+	newTree 		:POINTER TO BalancedBinarySearchTree;
+	currentNode 	:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	binaryRoot 		:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	rootObject		:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[clonedObject := 0;
+
+deepClone := THIS^.getClonedEmptyTree(
+	deepCloned := TRUE, 
+	newBalancedBinarySearchTree => newTree
+);
+
+RETURN (deepClone <> CNM_ReturnTypes.CloneResult.SUCCESS);
+clonedObject := newTree^;
+RETURN (THIS^.size = 0);
+deepClone := THIS^.root.deepClone(clonedObject => rootObject);
+
+IF ((deepClone = CNM_ReturnTypes.CloneResult.SUCCESS) AND_THEN THIS^.isObjectValid(rootObject)) THEN
+	__QUERYINTERFACE(rootObject,binaryRoot);
+	newTree^.root := binaryRoot;
+	newTree^.size := THIS^.size;
+ELSE
+	newTree^.deepDestruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="destructNodeAndAllChilds" Id="{51a96154-3dcc-46a6-928e-b99fdb24d3e4}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+destructs / deepdestructs all nodes in the subtrees of a specified node and this node
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED destructNodeAndAllChilds
+VAR_INPUT
+	(*the node that should be destructed with all it's childs*)
+	node							:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR_INPUT
+	(*if true also the node contents will be destructed, if false only the nodes will be destructed*)
+	destructNodeContents			:BOOL;
+END_VAR
+VAR
+	child 							:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED			:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectNull(node) THEN
+    RETURN;
+END_IF
+
+IF THIS^.isObjectValid(node.leftChild) THEN
+	child := node.leftChild;
+	THIS^.destructNodeAndAllChilds(node := child, destructNodeContents := destructNodeContents);
+	node.leftChild := OBJECT_NOT_REFERENCED;
+END_IF
+IF THIS^.isObjectValid(node.rightChild) THEN
+	child := node.rightChild;
+	THIS^.destructNodeAndAllChilds(node := child, destructNodeContents := destructNodeContents);
+	node.rightChild := OBJECT_NOT_REFERENCED;
+END_IF
+IF destructNodeContents THEN
+	node.deepDestruct();
+ELSE
+	node.destruct();	
+END_IF
+THIS^.decrementSize();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Exit" Id="{15fad1aa-f2ad-424d-beaf-460818e87b79}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it stays in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF 
+	THIS^.isObjectValid(THIS^.rootNode) 
+THEN	
+	THIS^.destructNodeAndAllChilds(node := THIS^.rootNode, destructNodeContents := TRUE);
+END_IF
+IF THIS^.isObjectValid(THIS^.nodeComparator) THEN
+	THIS^.nodeComparator.deepDestruct();
+END_IF
+IF (THIS^.nodestack <> 0) THEN
+	__DELETE(THIS^.nodestack);
+END_IF
+IF THIS^.isObjectValid(THIS^.subtractIterator) THEN
+	THIS^.subtractIterator.deepDestruct();
+END_IF
+IF THIS^.isObjectValid(THIS^.insertIterator) THEN
+	THIS^.insertIterator.deepDestruct();
+END_IF
+IF THIS^.isObjectValid(THIS^.intersectIterator) THEN
+	THIS^.intersectIterator.deepDestruct();
+END_IF
+IF THIS^.insertBuffer <> 0 THEN
+	__DELETE(THIS^.insertBuffer);
+END_IF
+IF THIS^.intersectedTree <> 0 THEN
+	__DELETE(THIS^.intersectedTree);
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{462c7d33-f285-491c-83ba-8f7e6424de87}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The constructor ``FB_init`` is needed to create an unique hash code.
+The hash code is a pseudo random number create with a [xorshift](https://en.wikipedia.org/wiki/Xorshift) algorithm.
+It can be overwritten on derivations, because it will be called implicit, ``SUPER^.FB_init()`` is not required.
+For more information check: [Behavoir with derived function blocks](https://infosys.beckhoff.com/content/1033/tc3_plc_intro/5482088715.html?id=6983869892358031022).
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD FB_init : BOOL
+VAR_INPUT
+	(* if TRUE, the retain variables are initialized (warm start / cold start)*)
+	bInitRetains	:BOOL;
+	(* if TRUE, the instance afterwards gets moved into the copy code (online change) *)
+	bInCopyCode		:BOOL;  
+	(*Optional comparator*)
+	nodeComparator 	:CNM_AbstractObject.IComparator	:= OBJECT_NOT_REFERENCED;
+END_VAR
+VAR
+	{attribute 'hide'}
+	newHashstate3		:CNM_AbstractObject.Hashcode;
+END_VAR
+VAR CONSTANT
+	{attribute 'hide'}
+	NUMBER_OF_LEFT_SHIFTS		:UINT	:= 17;
+	{attribute 'hide'}
+	NUMBER_OF_LEFT_ROTATIONS	:UINT   := 45;
+	OBJECT_NOT_REFERENCED 		:__XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.collectionSize := 0;
+THIS^.nodeComparator := nodeComparator;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getClonedComparator" Id="{c40dd733-0c95-4506-abbb-45223e839edb}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+prepares a new Comparator (if set)
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED getClonedComparator : CNM_ReturnTypes.CloneResult
+VAR_INPUT
+	(*True if called from deepclonecontext*)
+	deepCloned :BOOL;
+END_VAR
+VAR
+	newComparatorObject 		:CNM_AbstractObject.IObject;
+END_VAR
+VAR_OUTPUT
+	(*New comparator Object, null if not existent or not cloneable*)
+	newComparator 				:CNM_AbstractObject.IComparator;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF deepCloned THEN
+	IF NOT	(((
+				getClonedComparator := THIS^.nodeComparator.deepClone(clonedObject => newComparatorObject)
+			) = (	
+				CNM_ReturnTypes.CloneResult.SUCCESS
+			)
+		) AND_THEN (
+			__QUERYINTERFACE(newComparatorObject, newComparator)
+		)
+	) THEN
+		getClonedComparator := CNM_ReturnTypes.CloneResult.FAILED;
+		IF THIS^.isObjectValid(newComparatorObject) THEN
+			newComparatorObject.deepDestruct();
+		END_IF;		
+		RETURN;	
+	END_IF
+ELSE
+	IF NOT	(((
+				getClonedComparator := THIS^.nodeComparator.clone(clonedObject => newComparatorObject)
+			) = (	
+				CNM_ReturnTypes.CloneResult.SUCCESS
+			)
+		) AND_THEN (
+			__QUERYINTERFACE(newComparatorObject, newComparator)
+		)
+	) THEN
+		getClonedComparator := CNM_ReturnTypes.CloneResult.FAILED;
+		IF THIS^.isObjectValid(newComparatorObject) THEN
+			newComparatorObject.destruct();
+		END_IF;		
+		RETURN;	
+	END_IF
+END_IF
+	]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getClonedEmptyTree" Id="{40f9cf03-887b-4340-8548-724ee37c5d27}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+prepares a new empty tree object with the same internal state as THIS^
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED getClonedEmptyTree :CNM_ReturnTypes.CloneResult;
+VAR_INPUT
+	(*indicates if tree should be cloned or deepcloned*)
+	deepCloned					:BOOL;
+END_VAR
+VAR_OUTPUT
+	newBalancedBinarySearchTree :POINTER TO BalancedBinarySearchTree;
+END_VAR
+VAR
+	comparator 					: CNM_AbstractObject.IComparator;
+END_VAR
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED 		:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[getClonedEmptyTree := CNM_ReturnTypes.CloneResult.SUCCESS;
+IF 	THIS^.isObjectValid(THIS^.nodeComparator) THEN
+	getClonedEmptyTree := getClonedComparator(deepCloned := deepCloned, newComparator => comparator);
+END_IF;
+IF getClonedEmptyTree = CNM_ReturnTypes.CloneResult.SUCCESS THEN
+	newBalancedBinarySearchTree := __NEW(
+	BalancedBinarySearchTree(nodeComparator := comparator)
+	);
+	getClonedEmptyTree := CNM_AbstractObject.CNM_ReturnTypes.CloneResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getEqualObject" Id="{b661d9a5-5deb-473f-b418-e52165a56db4}" FolderPath="ISet\internal\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Searches an Object, that is equal to the provided object in terms of the compareTo Method (or an provided comparator from the parentstructure). 
+Does not care about equal or not equal hashcodes.
+ 
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** True when an object that is equal is found, false else
+
+*)
+
+METHOD INTERNAL getEqualObject :BOOL
+VAR_INPUT
+	(*The object for that an aquvivelent is searched*)
+	object :CNM_AbstractObject.IObject;
+END_VAR
+VAR_OUTPUT
+	(*The found object or null if not found*)
+	foundObject :CNM_AbstractObject.IObject;
+END_VAR
+VAR 
+	currentNode 			:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED 	:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[currentNode := THIS^.rootNode;
+getEqualObject := FALSE;
+foundObject := OBJECT_NOT_REFERENCED;
+
+IF THIS^.isObjectNull(currentNode) OR_ELSE THIS^.isObjectNull(object) THEN
+	getEqualObject := FALSE;
+	RETURN;
+END_IF
+WHILE THIS^.isObjectValid(currentNode) DO
+	CASE THIS^.compareNodes(object1 := object, object2 := currentNode.object) OF
+		CNM_ReturnTypes.ComparationResult.EQUAL:
+			foundObject := currentNode.object;
+			getEqualObject := TRUE;
+			RETURN;
+		CNM_ReturnTypes.ComparationResult.SMALLER:
+			currentNode := currentNode.leftChild;
+		CNM_ReturnTypes.ComparationResult.GREATER:
+			currentNode := currentNode.rightChild;
+	END_CASE
+END_WHILE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getInorderSuccessor" Id="{a8c4b37c-5c97-4db9-b245-899fdf5b0605}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+finds the next greater node (inorder successor) of a specified node
+ 
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``TRUE`` if inorder successor is found, ``FALSE`` else
+
+*)
+
+METHOD PROTECTED getInorderSuccessor :BOOL
+
+VAR_IN_OUT
+	nodebuffer				:POINTER TO CNM_CollectionInterfaces.IBinaryTreeNode;
+	bufferindex				:__XWORD;
+END_VAR
+VAR_OUTPUT
+	(*if successor is found then successor, else null*)
+	successor				:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR_INST
+	currentNode 		:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR CONSTANT 
+	OBJECT_NOT_REFERENCED	:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectNull(currentNode) THEN
+	currentNode := nodebuffer[bufferindex];
+	nodebuffer[bufferindex] := OBJECT_NOT_REFERENCED;
+	dec(bufferindex);
+END_IF
+successor := currentNode;
+getInorderSuccessor := THIS^.isObjectValid(currentNode) OR THIS^.isObjectValid(nodebuffer[bufferindex]);
+IF THIS^.isObjectValid(currentNode) THEN
+	currentNode := THIS^.getSmallestNode(startNode := currentNode.rightChild,nodebuffer := nodebuffer, bufferindex := bufferindex);	
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getSmallestNode" Id="{a6c5c02e-08ea-4df0-b6f3-8c851f03f9e4}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+finds the smallest node in a specified (sub)tree
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** the node with the smallest value based on the comparedTo Method
+
+*)
+
+METHOD PROTECTED getSmallestNode :CNM_CollectionInterfaces.IBinaryTreeNode
+VAR_INPUT
+	(*the node from that the search should be started*)
+	startNode 				:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR_IN_OUT
+	nodebuffer				:POINTER TO CNM_CollectionInterfaces.IBinaryTreeNode;
+	bufferindex				:__XWORD;
+END_VAR
+VAR
+	currNode				:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR CONSTANT 
+	OBJECT_NOT_REFERENCED	:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectValid(startNode) THEN
+	currNode := startNode;
+	IF THIS^.isObjectValid(startNode.leftChild) THEN
+		IF THIS^.isObjectValid(nodebuffer[bufferindex]) THEN
+			inc(bufferindex);
+		END_IF
+		nodebuffer[bufferindex] := currNode;
+		inc(bufferindex);
+		currNode := currNode.leftChild;
+	ELSE
+		getSmallestNode := startNode;
+		RETURN;
+	END_IF
+	WHILE THIS^.isObjectValid(currNode.leftChild) DO		
+		nodebuffer[bufferindex] := currNode;
+		currNode := currNode.leftChild;
+		inc(bufferindex);
+	END_WHILE
+	dec(bufferindex);
+	getSmallestNode := currNode;
+	RETURN;
+ELSE
+	getSmallestNode := OBJECT_NOT_REFERENCED;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="inc" Id="{ea69316a-0330-4491-9cbc-185999471af6}" FolderPath="Private\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+method to increase \_\_xword without overflow
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD PRIVATE inc
+VAR_IN_OUT
+	value 		:__XWORD;
+END_VAR
+VAR CONSTANT
+	XWORD_MAX	:__XWORD 	:= TO___XWORD(0 - 1);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[value := SEL(value = XWORD_MAX, value + 1, XWORD_MAX);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="incrementSize" Id="{eaa80fa6-aa9e-4399-9ea1-756dee36e33a}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+increments the size of the collection
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+
+METHOD PROTECTED incrementSize
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.collectionSize := THIS^.collectionSize+1;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="insert" Id="{fa78eca8-3568-4a95-a16b-a996d6a9d64c}" FolderPath="ITree\Internal\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method can be used to insert a single element into the tree.
+It will only be inserted if the tree does not already contain an equal element.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: operation successful
+	``ABORTED``: object was already contained, null object was passed or the tree itself was passed
+	``ERROR``: container allocation failed or tree itself was inconsistent
+*)
+
+METHOD INTERNAL insert :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The object that should be inserted*)
+	object				:CNM_AbstractObject.IObject;
+END_VAR
+VAR 
+	heightNotChanged	:BOOL	:= TRUE;
+	returnedRoot 		:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[insert := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN(THIS^.isObjectNull(object) OR_ELSE THIS^.isEqual(object));
+
+returnedRoot := THIS^.recursivInsert(
+	object := object,
+	elem := THIS^.rootNode,
+	heightNotChanged := heightNotChanged,
+	insertResult => insert
+);
+
+IF insert = CNM_ReturnTypes.SingleExecutionResult.SUCCESS THEN
+	THIS^.rootNode := returnedRoot;
+	THIS^.announceChange();
+	THIS^.incrementSize();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="insertCollection" Id="{d2fc8244-7e77-4be9-baf7-afa8351a9882}" FolderPath="ITree\Internal\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method inserts all elements of a collection into the tree.
+
+If any value of the collection could not be inserted because of duplication, operation isn't aborted, 
+insertion is tried for every element of the collection.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if insert could be made
+	``ABORTED``: execute has a falling edge during insert,
+	``BUSY``: Insert is in Progress
+	``ERROR``: the passed collection where not valid / contained invalid Elements
+	``IDLE``: method was never started
+
+*)
+METHOD INTERNAL insertCollection :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*The collection that should be inserted*)
+	collection					:CNM_CollectionInterfaces.ICollection;
+	(*If insert should be processed*)
+	execute 					:BOOL;
+END_VAR
+VAR_INST
+	cycleManager		:CNM_CycleManager.SimpleCycleManager;
+	index :LINT := 0;
+	insertFailed :BOOL;
+END_VAR
+VAR
+	iterateObject 				:CNM_AbstractObject.IObject;
+	insertOperationsThisCycle	:__XWORD := 0;
+END_VAR
+VAR CONSTANT
+	INIT :DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	PROCESSING :DINT := INIT + 1;
+	ROLL_BACK :DINT := PROCESSING + 1;
+	CLEAN_UP :DINT := ROLL_BACK + 1;
+	SUCCESS :DINT := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS;
+	ERROR :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[REPEAT
+	cycleManager(execute := execute);
+	CASE cycleManager.step.current OF
+	INIT:
+		insertFailed := FALSE;
+		cycleManager.configuration.sequence.requireSuccessStep := FALSE;
+		IF THIS^.isObjectNull(collection) OR_ELSE THIS^.isEqual(collection) THEN
+			cycleManager.proceedWith(ERROR);
+			CONTINUE;
+		END_IF
+		IF collection.isEmpty THEN
+			cycleManager.proceedWith(SUCCESS);
+			CONTINUE;
+		END_IF
+		IF THIS^.insertBuffer <> 0 THEN
+			__DELETE(THIS^.insertBuffer);
+		END_IF
+		THIS^.insertBuffer := __NEW(__XWORD, collection.size);
+		IF THIS^.isObjectValid(THIS^.insertIterator) THEN
+			THIS^.insertIterator.destruct();
+		END_IF
+		IF (collection.createNewIterator(iterator => THIS^.insertIterator) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS)
+		THEN
+			cycleManager.proceedWith(ERROR);
+			CONTINUE;
+		END_IF
+		THIS^.insertIterator.iterate(execute := FALSE);
+		index := 0;
+		cycleManager.proceed();
+	
+	PROCESSING:
+		WHILE 	(insertOperationsThisCycle < THIS^.maxCycleCompares) DO
+			CASE THIS^.insertIterator.iterate(execute := TRUE, object => iterateObject) OF
+			CNM_ReturnTypes.SingleExecutionState.BUSY:
+				CASE THIS^.insert(object := iterateObject) OF
+				CNM_ReturnTypes.SingleExecutionResult.ERROR:
+					cycleManager.proceedWith(ROLL_BACK);
+					EXIT;
+				CNM_ReturnTypes.SingleExecutionResult.SUCCESS:
+					THIS^.insertBuffer[index] := iterateObject;
+					index := index + 1;
+				END_CASE
+				insertOperationsThisCycle := (insertOperationsThisCycle + THIS^.treeHeight);
+				
+			CNM_ReturnTypes.SingleExecutionState.SUCCESS:
+				cycleManager.proceedWith(CLEAN_UP);
+				EXIT;
+			ELSE
+				cycleManager.proceedWith(ROLL_BACK);
+				EXIT;
+			END_CASE
+		END_WHILE
+	ROLL_BACK:
+		insertFailed := TRUE;
+		REPEAT 
+			THIS^.remove(THIS^.insertBuffer[index]);
+			index := index - 1;
+		UNTIL
+			(index < 0)
+		END_REPEAT 
+		cycleManager.proceed();
+	CLEAN_UP:
+		__DELETE(THIS^.insertBuffer);
+		IF THIS^.isObjectValid(THIS^.insertIterator) THEN
+			THIS^.insertIterator.destruct();
+			THIS^.insertIterator := 0;
+		END_IF
+		cycleManager.proceedWith(
+			step := SEL(insertFailed, SUCCESS, ERROR)
+		);  
+	END_CASE
+UNTIL 
+	(
+		(cycleManager.state <> CNM_ReturnTypes.SingleExecutionState.BUSY) 
+	OR_ELSE
+		(insertOperationsThisCycle >= THIS^.maxCycleCompares)
+	)
+END_REPEAT
+
+insertCollection := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantInsertCollection" Id="{48986e52-d286-4ff9-b692-fc0a6c5ce4f2}" FolderPath="ITree\Internal\instant\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method inserts all elements of a collection into the tree
+This takes only one cycle.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: operation successful
+	``SingleExecutionResult.ERROR``: out of memory
+	``SingleExecutionResult.ABORTED``: collection to insert wasn't valid (NULL) or the tree itself was passed
+
+*)
+METHOD INTERNAL instantInsertCollection : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The collection that should be inserted*) 
+	collection	: CNM_CollectionInterfaces.ICollection;
+END_VAR
+VAR
+	insertIterator :CNM_CollectionInterfaces.IIterator;
+	insertObject :CNM_AbstractObject.IObject;
+	insertedObjects :POINTER TO CNM_AbstractObject.IObject;
+	index :LINT := 0;
+	iteratorState :CNM_ReturnTypes.SingleExecutionState;
+	insertWasError :BOOL := FALSE;
+END_VAR
+VAR CONSTANT
+	NULL :__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[instantInsertCollection := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN( THIS^.isObjectNull(collection) OR_ELSE THIS^.isEqual(collection));
+IF collection.isEmpty THEN
+	instantInsertCollection := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+	RETURN;
+END_IF
+
+insertedObjects := __NEW(__XWORD, collection.size);
+IF insertedObjects = NULL THEN
+	instantInsertCollection := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	RETURN;
+END_IF
+
+IF (collection.createNewIterator(iterator => insertIterator) 
+ <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS)
+THEN
+	IF insertIterator <> 0 THEN
+		insertIterator.destruct();
+	END_IF
+	__DELETE(insertedObjects); 
+ 	instantInsertCollection := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+END_IF
+instantInsertCollection := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+insertIterator.iterate(execute := FALSE);
+WHILE (
+	(iteratorstate := insertIterator.iterate(execute := TRUE, object => insertObject)) 
+ 	= CNM_ReturnTypes.SingleExecutionState.BUSY
+) DO
+	CASE THIS^.insert(insertObject) OF
+	CNM_ReturnTypes.SingleExecutionResult.SUCCESS:
+		insertedObjects[index] := insertObject;
+		index := index +1;
+	CNM_ReturnTypes.SingleExecutionResult.ERROR: 
+		insertWasError := TRUE;
+		EXIT;
+	END_CASE
+END_WHILE
+
+IF insertWasError OR_ELSE (iteratorState <> CNM_ReturnTypes.SingleExecutionState.SUCCESS) THEN
+	REPEAT 
+		THIS^.remove(insertedObjects[index]);
+		index := index - 1;
+	UNTIL
+		(index < 0)
+	END_REPEAT 
+	instantInsertCollection := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+END_IF
+
+__DELETE(insertedObjects);
+insertIterator.destruct();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantIntersect" Id="{1d1d17d1-a6b8-47c3-9426-86275957bbb5}" FolderPath="ISet\internal\instant\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the intersection of this set and the given set
+Set intersection: Common elements between two sets.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Intersection of A and B: {3, 4}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: if intersect is complete
+	``SingleExecutionResult.ABORTED``: foreign set wasn't valid
+
+*)
+METHOD INTERNAL instantIntersect : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*foreign set to intersect with*)
+	set	: CNM_CollectionInterfaces.ISet;
+END_VAR
+VAR
+	iteratorState :CNM_ReturnTypes.SingleExecutionState;
+	iterator :CNM_CollectionInterfaces.IIterator;
+	newTree :BalancedBinarySearchTree(THIS^.nodeComparator);
+	iteratedObject :CNM_AbstractObject.IObject;
+	equalObject :CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[instantIntersect := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN(THIS^.isObjectNull(set) OR_ELSE THIS^.isEqual(set));
+IF set.size = 0 THEN
+	THIS^.clear();
+	instantIntersect := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+	RETURN;
+END_IF
+
+IF (set.createNewIterator(iterator => iterator)
+ <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS)
+THEN
+	IF iterator <> 0 THEN
+		iterator.destruct();
+	END_IF
+	newTree.destruct();
+ 	instantIntersect := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+END_IF
+
+iterator.iterate(execute := FALSE);
+REPEAT 
+	iteratorState := iterator.iterate(execute := TRUE, object => iteratedObject); 
+	CASE iteratorState OF
+	CNM_ReturnTypes.SingleExecutionState.BUSY:
+		IF THIS^.getEqualObject(object := iteratedObject, foundObject => equalObject) THEN
+			IF (newTree.insert(equalObject) = CNM_ReturnTypes.SingleExecutionResult.ERROR) THEN
+				iterator.destruct();
+				newTree.destruct();
+				instantIntersect := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+				RETURN;
+			END_IF
+		END_IF
+		
+	CNM_ReturnTypes.SingleExecutionState.ERROR:
+		iterator.destruct();
+		newTree.destruct();
+		instantIntersect := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+		RETURN;
+	END_CASE
+UNTIL
+	(iteratorState = CNM_ReturnTypes.SingleExecutionState.SUCCESS)
+END_REPEAT
+
+THIS^.clear();
+THIS^.root := newTree.root;
+THIS^.size := newTree.size;
+newTree.root := 0;
+newTree.destruct();
+iterator.destruct();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantMerge" Id="{f71eac6b-70a7-48ff-a2cd-746de657c4fb}" FolderPath="ISet\internal\instant\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the union of this set and the given set
+Set union: Combination of all elements from two sets.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Union of A and B: {1, 2, 3, 4, 5, 6}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if merge completed
+	```SingleExecutionResult.ABORTED``: foreign set wasn't valid
+
+*)
+METHOD INTERNAL instantMerge : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*foreign set to merge with*)
+	set	: CNM_CollectionInterfaces.ISet;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[instantMerge := THIS^.instantInsertCollection(collection := set);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantSubtract" Id="{57b7b87d-db63-4f69-9645-1a80cdff9a7b}" FolderPath="ISet\internal\instant\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the set difference of this set and the given set
+Set difference: Elements present in one set but not in the other.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Set difference (A - B): {1, 2}
+Set difference (B - A): {5, 6}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: if insert could made, error if object was already in the tree,
+	```SingleExecutionResult.ABORTED``: foreign set wasn't valid
+
+*)
+METHOD INTERNAL instantSubtract : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*foreign set to construct substraction*)
+	set	: CNM_CollectionInterfaces.ISet;
+END_VAR
+VAR
+	iterator :CNM_CollectionInterfaces.IIterator;
+	objectToRemove :CNM_AbstractObject.IObject;
+	iteratorState :CNM_ReturnTypes.SingleExecutionState;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[instantSubtract := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN(THIS^.isObjectNull(set) OR_ELSE THIS^.isEqual(set));
+
+instantSubtract := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+IF(	set.createNewIterator(iterator => iterator) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+	IF iterator <> 0 THEN
+		iterator.destruct();
+	END_IF
+END_IF
+
+iterator.iterate(FALSE);
+instantSubtract := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+REPEAT 
+	iteratorState := iterator.iterate(execute := TRUE, object => objectToRemove); 
+	CASE iteratorState OF
+	CNM_ReturnTypes.SingleExecutionState.BUSY:
+		THIS^.remove(objectToRemove);
+	CNM_ReturnTypes.SingleExecutionState.ERROR:
+		instantSubtract := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+		EXIT;
+	END_CASE
+UNTIL
+	(iteratorState = CNM_ReturnTypes.SingleExecutionState.SUCCESS)
+END_REPEAT
+
+iterator.destruct();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="intersect" Id="{f514e0e0-9129-4bf0-a4b4-01590a150a27}" FolderPath="ISet\internal\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the intersection of this set and the given set
+Set intersection: Common elements between two sets.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Intersection of A and B: {3, 4}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if intersect is complete
+	``ABORTED``: execute has a falling edge during intersect,
+	``BUSY``: Intersect is in Progress
+	``ERROR``: the passed collection was not valid or contained invalid Elements or the collection changed during intersect
+	``IDLE``: Currently no intersect in progress
+
+*)
+
+METHOD INTERNAL intersect :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*foreign set to intersect with*)
+	set :CNM_CollectionInterfaces.ISet;
+	(*If intersect should be processed*)
+	execute		:BOOL;
+END_VAR
+VAR_INST
+	cycleManager :CNM_CycleManager.SimpleCycleManager;
+	changeIndex :__XWORD;
+END_VAR
+VAR
+	iteratedObject, intersectObject :CNM_AbstractObject.IObject;
+	iterateState 				:CNM_ReturnTypes.SingleExecutionState;
+	insertOperationsThisCycle	:UDINT := 0;
+	objectsRemoved :BOOL := FALSE;
+END_VAR
+VAR CONSTANT
+	INIT :DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	PROCESSING :DINT := INIT + 1;
+	SUCCESS :DINT := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS;
+	ERROR :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[REPEAT
+	cycleManager(execute := execute);
+	CASE cycleManager.step.current OF
+	INIT:
+		IF THIS^.isObjectValid(THIS^.intersectIterator) THEN 
+			THIS^.intersectIterator.destruct();
+		END_IF
+		IF THIS^.intersectedTree <> 0 THEN
+			__DELETE(THIS^.intersectedTree);
+		END_IF
+		IF (THIS^.isObjectNull(set)) THEN
+			cycleManager.proceedWith(ERROR);
+			CONTINUE;
+		ELSIF (THIS^.isEqual(set)) THEN
+			cycleManager.proceedWith(SUCCESS);
+			CONTINUE;
+		END_IF 
+		cycleManager.configuration.sequence.requireSuccessStep := FALSE;
+		IF set.size = 0 THEN
+			THIS^.clear();
+			cycleManager.proceedWith(SUCCESS);
+			CONTINUE;
+		END_IF
+		
+		
+		IF (set.createNewIterator(iterator => THIS^.intersectIterator) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+			cycleManager.proceedWith(ERROR);
+			CONTINUE;	
+		END_IF
+		THIS^.intersectedTree := __NEW(BalancedBinarySearchTree( nodeComparator := THIS^.nodeComparator));
+		IF THIS^.intersectedTree <> 0 THEN
+			THIS^.intersectIterator.destruct();
+			cycleManager.proceedWith(ERROR);
+			CONTINUE;	
+		END_IF
+		THIS^.intersectIterator.iterate(FALSE);
+		cycleManager.proceed();
+		
+	PROCESSING:
+		CASE THIS^.intersectIterator.iterate(execute := TRUE, object => iteratedObject) OF
+		CNM_ReturnTypes.SingleExecutionState.BUSY:
+			IF THIS^.getEqualObject(object := iteratedObject, foundObject => intersectObject) THEN
+				IF (THIS^.intersectedTree^.insert(intersectObject) <> CNM_ReturnTypes.SingleExecutionResult.ERROR) THEN
+					insertOperationsThisCycle := insertOperationsThisCycle + log2(THIS^.intersectedTree^.size);
+				ELSE
+					cycleManager.proceedWith(ERROR);
+					CONTINUE;
+				END_IF
+			END_IF
+			insertOperationsThisCycle := insertOperationsThisCycle + log2(THIS^.size);
+		CNM_ReturnTypes.SingleExecutionState.ERROR:
+			cycleManager.proceedWith(ERROR);
+			CONTINUE;
+		CNM_ReturnTypes.SingleExecutionState.SUCCESS:
+			THIS^.clear();
+			THIS^.root := THIS^.intersectedTree^.root;
+			THIS^.size := THIS^.intersectedTree^.size;
+			THIS^.intersectedTree^.root := 0;
+			THIS^.intersectedTree^.destruct();
+			THIS^.intersectedTree := 0;
+			THIS^.intersectIterator.destruct();
+			THIS^.intersectIterator := 0;
+			cycleManager.proceedWith(SUCCESS);
+			CONTINUE;
+		END_CASE
+	
+	ERROR:
+		THIS^.intersectIterator.destruct();
+		THIS^.intersectIterator := 0;
+		__DELETE(THIS^.intersectedTree);
+		THIS^.intersectedTree := 0;
+	END_CASE	
+UNTIL
+	(insertOperationsThisCycle >= THIS^.maxCycleCompares) OR_ELSE
+	(cycleManager.state <> CNM_ReturnTypes.SingleExecutionState.BUSY)
+END_REPEAT
+
+intersect := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="iterate" Id="{1165b274-9aa3-49a3-b241-92440c654b82}" FolderPath="ICollection\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method returns the next object in the iteration and returns an execution state.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if last object from collection was returned,
+	``ABORTED``: execute has a falling edge during iterate,
+	``BUSY``: When iterate had rising edge on execute and not all objects had been returned yet
+	``IDLE``: iterate not in progress, execute is false and iterate reseted 
+	
+*)
+
+METHOD PROTECTED iterate :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	execute					:BOOL;
+END_VAR
+VAR_OUTPUT
+	object					:CNM_AbstractObject.IObject;
+END_VAR
+VAR_INST
+	currentNode				:CNM_CollectionInterfaces.IBinaryTreeNode;
+	stacktop				:__XWORD := 0;
+	cycleManager	:CNM_CycleManager.SimpleCycleManager;
+	lastTreeVersion :__XWORD;
+END_VAR
+VAR 
+	stacksize 				:UDINT;
+END_VAR
+VAR CONSTANT 
+	INIT :DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	ITERATING :DINT := INIT + 1;
+	SUCCESS :DINT := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS;
+	ERROR :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+	OBJECT_NOT_REFERENCED	:__XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[cycleManager(execute := execute);
+CASE cycleManager.step.current OF
+INIT:
+	cycleManager.configuration.sequence.requireSuccessStep := FALSE;
+	stacksize := THIS^.treeHeight;
+	object := OBJECT_NOT_REFERENCED;
+	lastTreeVersion := THIS^.changesToCollection;
+	__DELETE(THIS^.nodestack);
+	stacktop := 0;
+	THIS^.nodestack := __NEW(__XWORD, stacksize);
+	currentNode := THIS^.getSmallestNode(startNode:=THIS^.rootNode,nodebuffer := THIS^.nodestack,bufferindex := stacktop);
+	IF THIS^.isObjectValid(currentNode) THEN
+		object := currentNode.object;
+		THIS^.getInorderSuccessor(
+          nodebuffer := THIS^.nodestack, 
+          bufferindex := stacktop, 
+          successor => currentNode
+        );
+	END_IF
+	cycleManager.proceedWith(
+		step := SEL((THIS^.size > 0), SUCCESS, ITERATING)
+	);
+	
+ITERATING:
+	IF THIS^.changesToCollection <> lastTreeVersion THEN
+		cycleManager.proceedWith(ERROR);
+		iterate := CNM_ReturnTypes.SingleExecutionState.ERROR;
+		RETURN;
+	END_IF
+	IF THIS^.isObjectValid(currentNode) THEN
+		object := currentNode.object;
+		THIS^.getInorderSuccessor(
+          nodebuffer := THIS^.nodestack, 
+          bufferindex := stacktop, 
+          successor => currentNode
+        );
+	ELSE
+		__DELETE(THIS^.nodestack);
+		cycleManager.proceedWith(SUCCESS);
+	END_IF
+END_CASE
+
+iterate := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="maxCycleCompares" Id="{b26df4aa-6de9-47ef-8c2b-f276d97d6897}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property defines the maximum amount of compares that should be done per Cycle. Is optional as default should be set by class.
+Passing zero resets to class specific default.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY maxCycleCompares : UDINT
+]]></Declaration>
+      <Get Name="Get" Id="{c0315fbc-ad89-416f-86bc-e9746a11dc77}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[maxCycleCompares := THIS^.upperCompareBound;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{e481c14c-4544-4224-8b9e-5f8f2655f7d7}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.upperCompareBound := SEL(
+	maxCycleCompares = 0,
+	maxCycleCompares,
+	GeneralParameters.DEFAULT_OPERATIONS_PER_CYCLE
+);
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="merge" Id="{33526066-0643-4ae0-a9e5-4102dd229809}" FolderPath="ISet\internal\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the union of this set and the given set
+Set union: Combination of all elements from two sets.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Union of A and B: {1, 2, 3, 4, 5, 6}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if merge completed, 
+	``ABORTED``: execute has a falling edge during merge,
+	``BUSY``: merge is in Progress
+	``ERROR``: the passed collection where not valid / contained invalid Elements
+	``IDLE``: Currently no merge in progress
+
+*)
+
+METHOD INTERNAL merge :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*foreign set to merge with*)
+	set :CNM_CollectionInterfaces.ISet;
+	(*If merge should be processed*)
+	execute		:BOOL;
+END_VAR
+VAR
+	object		 	:CNM_AbstractObject.IObject;
+	iterateState	:CNM_ReturnTypes.SingleExecutionState;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[merge := THIS^.insertCollection(
+	collection := set,
+	execute := execute);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="recursivInsert" Id="{402cdd05-b4c0-455f-ad8b-7d5d961537fc}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+recursiv insert function, tries to insert in the Tree and if not on right position call itself again on a subtree, on way out of recursin (re)balance tree
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** the node that is the new root of the subtree for that the recursiv method is called
+
+*)
+
+METHOD PROTECTED recursivInsert :CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+VAR_INPUT
+	(*the object that shoul be inserted*)
+	object 						:CNM_AbstractObject.IObject;
+	(*the root of the tree we try to insert in*)
+	elem 						:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR_IN_OUT
+	(*is changed to false when insert was successful*)
+	heightNotChanged 			:BOOL;
+END_VAR
+VAR 
+	rightChild 					:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	binaryRightChild 			:CNM_CollectionInterfaces.IBinaryTreeNode;
+	binaryLeftChild 			:CNM_CollectionInterfaces.IBinaryTreeNode;
+	leftChild		  			:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR_OUTPUT
+	(*SUCCESS if node could be inserted, ERROR if object already in the tree, ABORTED if object was null or empty node found*)
+	insertResult 				:CNM_ReturnTypes.SingleExecutionResult;
+END_VAR
+VAR CONSTANT
+	OBJECT_IS_NOT_REFERENCED	:__XWORD := 0; 
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectNull(elem) AND NOT THIS^.isObjectNull(object) THEN
+	IF (THIS^.collectionFactory.getNewBBSTreeNode(object := object, node => recursivInsert) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+		insertResult := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	ELSE
+		insertResult := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+	END_IF
+	RETURN;
+ELSIF  THIS^.isObjectNull(object) OR_ELSE THIS^.isObjectNull(elem.object) THEN
+	insertResult := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+	RETURN;
+END_IF
+	
+
+CASE THIS^.compareNodes(object, elem.object) OF
+ 	CNM_ReturnTypes.ComparationResult.EQUAL:
+		recursivInsert := elem;
+		insertResult := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+		RETURN;
+ 	CNM_ReturnTypes.ComparationResult.SMALLER: 
+		IF (THIS^.isObjectNull(elem.leftChild)) THEN
+			IF (THIS^.collectionFactory.getNewBBSTreeNode(object := object, node => leftChild) = CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+				__QUERYINTERFACE(leftChild, binaryLeftChild);
+				elem.leftChild := binaryLeftChild;
+				heightNotChanged := FALSE;
+				insertResult := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+			ELSE
+				insertResult := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+			END_IF
+		ELSE
+			__QUERYINTERFACE(elem.leftChild, leftChild);
+			leftChild := THIS^.recursivInsert(object := object, elem := leftChild, heightNotChanged := heightNotChanged, insertResult => insertResult);	
+			__QUERYINTERFACE(leftChild,binaryLeftChild);
+			elem.leftChild := binaryLeftChild;
+		END_IF
+		recursivInsert := THIS^.checkRightRotation(elem:=elem,heightNotChanged:=heightNotChanged, removing := FALSE);
+		RETURN;
+	CNM_ReturnTypes.ComparationResult.Greater:
+		IF THIS^.isObjectNull(elem.rightChild) THEN 
+			IF (THIS^.collectionFactory.getNewBBSTreeNode(object := object, node => rightChild) = CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+				__QUERYINTERFACE(rightChild,binaryRightChild);
+				elem.rightChild := binaryRightChild;
+				heightNotChanged := FALSE;
+				insertResult := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+			ELSE
+				insertResult := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+			END_IF
+		ELSE
+			__QUERYINTERFACE(elem.rightChild,rightChild);
+			rightChild := THIS^.recursivInsert(object:=object,elem:=rightChild,heightNotChanged:=heightNotChanged,insertResult=>insertResult);
+			__QUERYINTERFACE(rightChild,binaryRightChild);
+			elem.rightChild := binaryRightChild;	
+		END_IF
+		recursivInsert := THIS^.checkLeftRotation(elem:=elem,heightNotChanged:=heightNotChanged,removing := FALSE);
+		RETURN;
+END_CASE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="recursivRemove" Id="{516a5aeb-77de-44d5-8b9e-f45698abd6db}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+recursiv remove an element tries to remove element from tree, if not possible calls itself on subtree, on way out of recursin (re)balance tree
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** the node that is the new root of the subtree for that the recursiv method is called
+
+*)
+
+METHOD PROTECTED recursivRemove :CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+VAR_INPUT
+	(*The object that should be removed*)
+	object 						:CNM_AbstractObject.IObject;
+	(*The root of the tree we try to delete the object from *)
+	elem 						:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR_IN_OUT
+	(*changed to false when node is removed*)
+	heightNotChanged 			:BOOL;
+END_VAR
+VAR 
+	leftChild					:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	binaryLeftChild 			:CNM_CollectionInterfaces.IBinaryTreeNode;
+	binaryRightChild 			:CNM_CollectionInterfaces.IBinaryTreeNode;
+	rightChild 					:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	testrightChild 				:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR_OUTPUT
+	(*SUCCESS, if remove was successful*)
+	removeResult 				:CNM_ReturnTypes.SingleExecutionResult;
+END_VAR
+VAR CONSTANT
+	OBJECT_IS_NOT_REFERENCED	:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectNull(elem) THEN
+	recursivRemove := OBJECT_IS_NOT_REFERENCED;
+	removeResult := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+	RETURN;
+ELSIF THIS^.isObjectNull(object) OR_ELSE THIS^.isObjectNull(elem.object) THEN
+	removeResult := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	RETURN;
+END_IF;
+
+CASE THIS^.compareNodes(object,elem.object) OF
+	CNM_AbstractObject.CNM_ReturnTypes.ComparationResult.SMALLER:
+		__QUERYINTERFACE(elem.leftChild,leftChild);
+		leftChild := THIS^.recursivRemove(object:=object,elem:=leftChild, heightNotChanged := heightNotChanged,removeResult=>removeResult);
+		__QUERYINTERFACE(leftChild,binaryLeftChild);
+		elem.leftChild := binaryLeftChild;
+		recursivRemove := checkLeftRotation(elem := elem, heightNotChanged := heightNotChanged,removing := TRUE);
+		RETURN;
+	CNM_AbstractObject.CNM_ReturnTypes.ComparationResult.GREATER:
+		__QUERYINTERFACE(elem.rightChild,rightChild);
+		rightChild := THIS^.recursivRemove(object := object, elem := rightChild, heightNotChanged := heightNotChanged,removeResult=>removeResult);
+		__QUERYINTERFACE(rightChild,binaryRightChild);
+		elem.rightChild := binaryRightChild;
+		recursivRemove := checkRightRotation(elem := elem, heightNotChanged := heightNotChanged,removing := TRUE);
+		RETURN;
+	CNM_AbstractObject.CNM_ReturnTypes.ComparationResult.EQUAL:
+		IF THIS^.isObjectNull(elem.leftChild) THEN
+			heightNotChanged := FALSE;
+			__QUERYINTERFACE(elem.rightChild,recursivRemove);
+			
+		ELSIF THIS^.isObjectNull(elem.rightChild) THEN
+			heightNotChanged:=FALSE;
+			__QUERYINTERFACE(elem.leftChild,recursivRemove);
+		ELSE
+			recursivRemove := searchSuccessor(elem:=elem,heightNotChanged:=heightNotChanged);
+			recursivRemove.balance := elem.balance;
+			recursivRemove.leftChild := elem.leftChild;
+			recursivRemove.rightChild := elem.rightChild;
+			recursivRemove := checkRightRotation(elem := recursivRemove,heightNotChanged:=heightNotChanged,removing := TRUE);
+		END_IF
+		removeResult := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+		elem.leftChild := OBJECT_IS_NOT_REFERENCED;
+		elem.rightChild := OBJECT_IS_NOT_REFERENCED;
+		elem.destruct();
+		RETURN;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="recursivSearchSuccessor" Id="{c0905965-9616-4624-a8f3-0fae3fb13623}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+gets the successor of a node and removes it from the tree so it can be inserted at another place (used when remove) and rebalances tree
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** The successor node of the elem node
+
+*)
+
+METHOD PROTECTED recursivSearchSuccessor :CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+VAR_INPUT
+	(*the element a successor should be searched for*)
+	elem 				:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR_IN_OUT
+	(*True if the successor was removed*)
+	heightNotChanged 	:BOOL;
+END_VAR
+VAR_OUTPUT
+	(*returns the new root, bc root can be changed bc of rotation*)
+	newRoot				:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR
+	leftChild			:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT THIS^.isObjectNull(elem.leftChild.leftChild) THEN
+	__QUERYINTERFACE(elem.leftChild,leftChild);
+	recursivSearchSuccessor := THIS^.recursivSearchSuccessor(elem:=leftChild,heightNotChanged := heightNotChanged,newRoot => newRoot);
+	elem.leftChild := newRoot;
+	newRoot := checkLeftRotation(elem:=elem,heightNotChanged:=heightNotChanged,removing:=TRUE);
+	RETURN;
+ELSE
+	__QUERYINTERFACE(elem.leftChild,leftChild);
+	recursivSearchSuccessor := leftChild;
+	elem.leftChild := elem.leftChild.rightChild;
+	newRoot := checkLeftRotation(elem:=elem,heightNotChanged:=heightNotChanged,removing:=TRUE);
+	RETURN;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="remove" Id="{110cfc72-6c84-4b43-bf5b-b905c33d408e}" FolderPath="ITree\Internal\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+Method to remove an object from the tree.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if remove could be made
+	``ABORTED``: if object wasn't in the tree
+	``ERROR``: if object wasn't valid
+
+*)
+
+METHOD INTERNAL remove :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(* The object that should be removed *)
+	object				:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	heightNotChanged	:BOOL := TRUE;
+	newRootNode				:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[newRootNode := THIS^.recursivRemove(
+	object:=object,
+	elem:=THIS^.rootNode,
+	heightNotChanged := heightNotChanged,
+	removeResult=>remove
+);
+IF remove = CNM_ReturnTypes.SingleExecutionResult.SUCCESS THEN
+	THIS^.decrementSize();
+	THIS^.announceChange();
+	THIS^.rootNode := newRootNode;
+	RETURN;		
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="reorganizeLeftRotate" Id="{12789971-c974-4d9b-9c64-8c79c2e338ee}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+performs a left rotation around a specified node and cares about the subtress and balance
+ 
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** the new root that replaced the one that was used for rotation
+
+*)
+
+METHOD PROTECTED reorganizeLeftRotate :CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+VAR_INPUT
+	(*The element around that should be rotatet*)
+	elem				:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	(*indicates if method was called in context of remove (then true) or in context of insert (then false) *)
+	removing				:BOOL;
+END_VAR
+VAR_IN_OUT
+	(*false if the height of the tree changed*)
+	heightNotChanged 	:BOOL;
+END_VAR
+VAR 
+	internLeftChild		:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	internRightChild	:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode; 
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[__QUERYINTERFACE(elem.rightChild,internRightChild);
+
+CASE internRightChild.balance OF
+	CNM_CollectionInterfaces.TreeBalance.RIGHTDEEPER:
+		elem := THIS^.rotateLeft(elem);
+		__QUERYINTERFACE(elem.leftChild,internLeftChild);
+		internLeftChild.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+		elem.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+		heightNotChanged := NOT removing;
+		reorganizeLeftRotate := elem;
+	CNM_CollectionInterfaces.TreeBalance.EQUALDEEP: 
+		elem := THIS^.rotateLeft(elem);
+		__QUERYINTERFACE(elem.leftChild,internLeftChild);
+		internLeftChild.balance := CNM_CollectionInterfaces.TreeBalance.RIGHTDEEPER;
+		elem.balance := CNM_CollectionInterfaces.TreeBalance.LEFTDEEPER;
+		heightNotChanged := removing;
+		reorganizeLeftRotate := elem;
+	CNM_CollectionInterfaces.TreeBalance.LEFTDEEPER:
+		elem.rightChild := THIS^.rotateRight(internRightChild);
+		elem := THIS^.rotateLeft(elem);
+		THIS^.adaptBalanceAfterDoubleRotation(elem:=elem);
+		elem.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+		heightNotChanged := removing;
+		reorganizeLeftRotate := elem;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="reorganizeRightRotate" Id="{ba925b64-30c8-4ce1-8b8c-2efbfc919f36}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+rotates right around a specified node, and cares about subtrees and balance
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** the node that replaced the node that was used to rotate around
+
+*)
+
+METHOD PROTECTED reorganizeRightRotate :CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+VAR_INPUT
+	(*the node around the rotation should be performed*)
+	elem 				:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	(*indicates if method was called in context of remove (then true) or in context of insert (then false) *)
+	removing 				:BOOL;
+END_VAR
+VAR_IN_OUT
+	(*false if height changed, set to true when rotation rebalanced the tree*)
+	heightNotChanged 	:BOOL;
+END_VAR
+VAR 
+	leftChild 			:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	rightChild 			:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[__QUERYINTERFACE(elem.leftChild,leftChild);
+__QUERYINTERFACE(elem.rightChild, rightChild);
+
+CASE leftChild.balance OF 
+	CNM_CollectionInterfaces.TreeBalance.LEFTDEEPER: 
+		elem := rotateRight(elem:=elem);
+		__QUERYINTERFACE(elem.rightChild, rightChild);
+		rightChild.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+		elem.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+		heightNotChanged := NOT removing;
+		reorganizeRightRotate := elem;
+		RETURN;
+	CNM_CollectionInterfaces.TreeBalance.EQUALDEEP: 
+		elem := rotateRight(elem:=elem);
+		__QUERYINTERFACE(elem.rightChild, rightChild);
+		rightChild.balance := CNM_CollectionInterfaces.TreeBalance.LEFTDEEPER;
+		elem.balance := CNM_CollectionInterfaces.TreeBalance.RIGHTDEEPER;
+		heightNotChanged := removing;
+		reorganizeRightRotate := elem;
+		RETURN;
+	CNM_CollectionInterfaces.TreeBalance.RIGHTDEEPER:
+		elem.leftChild := rotateLeft(elem:=leftChild);
+		elem := rotateRight(elem:=elem);
+		adaptBalanceAfterDoubleRotation(elem:=elem);
+		elem.balance := CNM_CollectionInterfaces.TreeBalance.EQUALDEEP;
+		heightNotChanged := NOT removing;
+		reorganizeRightRotate := elem;
+		RETURN;
+		
+END_CASE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="root" Id="{1bfeb2b4-6649-42bb-9d41-568be2272ef5}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property points to the root of a tree
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY INTERNAL root : CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+]]></Declaration>
+      <Get Name="Get" Id="{a0aff5d8-113c-4dd1-b690-dab2e4618b43}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[root := THIS^.rootNode;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{0d510f8c-2247-4418-8077-5f370845636f}">
+        <Declaration><![CDATA[
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.rootNode := root;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="rotateLeft" Id="{1c821121-b13f-4e29-a1e2-8d658f96b796}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+rotates a tree around a node
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** the new root
+
+*)
+
+METHOD PROTECTED rotateLeft :CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+VAR_INPUT
+	(*The element that sould be rotatet around*)
+	elem	:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR 
+	newRoot	:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;	
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[__QUERYINTERFACE(elem.rightChild, newRoot);
+elem.rightChild := newRoot.leftChild;
+newRoot.leftChild := elem;
+rotateLeft := newRoot;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="rotateRight" Id="{e1ace755-bffa-4606-a7cc-fee855053e8a}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+rotates right around a specified node, doesnt care about balance and stuff, this is done in method ``reorganizeRightRotate``
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** the new root
+
+*)
+
+METHOD PROTECTED rotateRight :CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+VAR_INPUT
+	(*the element that should be rotatet around*)
+	elem	:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR
+	newRoot	:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[__QUERYINTERFACE(elem.leftChild,newRoot);
+elem.leftChild := newRoot.rightChild;
+newRoot.rightChild := elem;
+rotateRight := newRoot;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="searchSuccessor" Id="{2607d644-30ee-4c5e-8f06-abfded958ea9}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+searches a successor and removes it from the tree so it can be used to replace another (deleted) node
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** The successor node
+
+*)
+
+METHOD PROTECTED searchSuccessor :CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+VAR_INPUT
+	(*The element that the successor is searched from*)
+	elem 				:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR_IN_OUT
+	(*True if operation did not change the height of the subtree / heightchange was handled*)
+	heightNotChanged 	:BOOL;
+END_VAR
+VAR
+	newRoot				:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	rightChild			:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[__QUERYINTERFACE(elem.rightChild,rightChild);
+IF THIS^.isObjectNull(elem.rightChild.leftChild) THEN
+	searchSuccessor := rightChild;
+	elem.rightChild := elem.rightChild.rightChild;
+	heightNotChanged := FALSE;
+	RETURN;
+ELSE
+	searchSuccessor := recursivSearchSuccessor(elem:=rightChild,heightNotChanged:=heightNotChanged,newRoot=>newRoot);
+	elem.rightChild := newRoot;
+	RETURN;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="set" Id="{a527814a-dd9a-424f-a27c-a382ca37eea9}" FolderPath="ISet\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns a fluent interface to set operations, e.g. intersect() and subtract().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY set :CNM_CollectionInterfaces.ISetStrategy
+]]></Declaration>
+      <Get Name="Get" Id="{19143a15-82b6-4a14-847c-f03948faca70}">
+        <Declaration><![CDATA[VAR_INST
+	setExecutor :SetStrategyExecutor(THIS^);
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[set := setExecutor;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="setNodeComparator" Id="{5540a509-c3d9-4349-aa53-360f0e394321}" FolderPath="ISearchTree\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Sets a comparator, that is used to compare two nodes of this tree.
+Optional, if not set, object.compareTo will be used.
+
+**Attention:**
+	The comparator can only be set if the tree has at most one element.
+
+**Attention:**
+	Will be deep destructed within the deep destruct context of this class.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: new comparator was set
+	``ABORTED``: tree already contained more than one object
+	
+*)
+
+METHOD setNodeComparator :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*the comparator that should be used to compare two nodes*)
+	nodeComparator	:CNM_AbstractObject.IComparator;
+END_VAR
+VAR CONSTANT
+	MAXIMUM_SIZE_TO_SET_COMPARATOR :UDINT := 1;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.size > MAXIMUM_SIZE_TO_SET_COMPARATOR THEN
+	setNodeComparator := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+ELSE
+	THIS^.nodeComparator := nodeComparator;
+	setNodeComparator := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="size" Id="{092c693d-ab46-4081-b93f-24663aa7fe37}" FolderPath="ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property allows to change the collection size without using insert / remove etc.
+Can be used for clone operations etc. should never be visible for the user.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY INTERNAL size :UDINT
+]]></Declaration>
+      <Set Name="Set" Id="{65aa6c1c-1e72-41e7-be08-331daaa6d6f8}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.collectionSize := size;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="subtract" Id="{cea4544f-7398-4e06-bbff-548fb7543589}" FolderPath="ISet\internal\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the set difference of this set and the given set
+Set difference: Elements present in one set but not in the other.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Set difference (A - B): {1, 2}
+Set difference (B - A): {5, 6}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if insert could made, error if object was already in the tree,
+	``ABORTED``: execute has a falling edge during insert,
+	``BUSY``: Insert is in Progress
+	``ERROR``: the passed collection where not valid / contained invalid Elements
+	``IDLE``: Currently no insert in progress
+
+*)
+
+METHOD INTERNAL subtract :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*foreign set to construct substraction*)
+	set 						:CNM_CollectionInterfaces.ISet;
+	(*If substract should be processed*)
+	execute						:BOOL;
+END_VAR
+VAR_INST
+	cycleManager :CNM_CycleManager.SimpleCycleManager;
+	changeIndex :__XWORD;
+END_VAR
+VAR
+	object 						:CNM_AbstractObject.IObject;
+	iterateState				:CNM_ReturnTypes.SingleExecutionState;
+	insertOperationsThisCycle	:__XWORD;
+END_VAR
+VAR CONSTANT
+	INIT :DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	PROCESSING :DINT := INIT + 1;
+	SUCCESS :DINT := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS;
+	ERROR :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectNull(set) THEN
+	subtract := CNM_ReturnTypes.SingleExecutionState.ERROR;
+	cycleManager.proceedWith(ERROR);
+	RETURN;
+END_IF
+insertOperationsThisCycle := 0;
+REPEAT
+	cycleManager(execute := execute);
+	CASE cycleManager.step.current OF
+	INIT:
+		cycleManager.configuration.sequence.requireSuccessStep := FALSE;
+		IF ((THIS^.size = 0) OR_ELSE (set.size = 0)) THEN
+			cycleManager.proceedWith(SUCCESS);
+			subtract := CNM_ReturnTypes.SingleExecutionState.SUCCESS;
+			RETURN;
+		END_IF
+		IF THIS^.isObjectValid(THIS^.subtractIterator) THEN
+			THIS^.subtractIterator.destruct();
+		END_IF
+		IF (set.createNewIterator(iterator => THIS^.subtractIterator) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS) 
+		THEN
+			cycleManager.proceedWith(ERROR);
+			subtract := CNM_ReturnTypes.SingleExecutionState.ERROR;
+			RETURN;
+		END_IF
+		THIS^.subtractIterator.iterate(execute := FALSE);	
+		changeIndex := THIS^.changesToCollection;
+		cycleManager.proceed();
+		
+	PROCESSING:
+		IF (changeIndex <> THIS^.changesToCollection) THEN
+			cycleManager.proceedWith(ERROR);
+			subtract := CNM_ReturnTypes.SingleExecutionState.ERROR;
+			RETURN;
+		END_IF
+		WHILE (( iterateState := THIS^.subtractIterator.iterate(execute := TRUE, object => object)) = CNM_ReturnTypes.SingleExecutionState.BUSY) DO
+			CASE THIS^.remove(object) OF
+			CNM_ReturnTypes.SingleExecutionResult.ERROR:
+				subtract := CNM_ReturnTypes.SingleExecutionState.ERROR;
+				cycleManager.proceedWith(ERROR);
+				RETURN;
+			END_CASE
+			insertOperationsThisCycle := (insertOperationsThisCycle + THIS^.treeHeight);
+			IF (insertOperationsThisCycle >= THIS^.maxCycleCompares) THEN
+				EXIT;
+			END_IF
+		END_WHILE
+		
+		CASE iterateState OF
+		CNM_ReturnTypes.SingleExecutionState.SUCCESS:
+			THIS^.subtractIterator.destruct();
+			cycleManager.proceedWith(SUCCESS);
+		CNM_ReturnTypes.SingleExecutionState.ERROR:
+			THIS^.subtractIterator.destruct();
+			cycleManager.proceedWith(ERROR);
+		END_CASE
+	
+	END_CASE
+UNTIL
+	(insertOperationsThisCycle >= THIS^.maxCycleCompares) OR_ELSE
+	(cycleManager.state <> CNM_ReturnTypes.SingleExecutionState.BUSY)
+END_REPEAT
+subtract := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="tree" Id="{039093ec-dddf-4d33-8db2-ff3cbf4c1fb1}" FolderPath="ITree\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns a fluent interface to tree operations, e.g. insert() and remove().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY tree : CNM_CollectionInterfaces.ITreeStrategy
+]]></Declaration>
+      <Get Name="Get" Id="{2394a7fc-0fd8-4432-9471-c5675c1649c5}">
+        <Declaration><![CDATA[VAR_INST
+	treeExecutor :TreeStrategyExecutor(THIS^);
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[tree := treeExecutor;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="treeHeight" Id="{517bcb75-4f10-42f5-bf68-10dfa2a0143e}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+
+Function to calculate the height of a tree, as its a balanced binary tree, is defined as 
+height := log\ :sub:`2`\(Nodeamount) (Truncated)
+log\ :sub:`2`\(x) := log(x)/log(2)
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY PROTECTED treeHeight : USINT
+]]></Declaration>
+      <Get Name="Get" Id="{af460b7d-2156-4a5a-a571-0b89c3ca806f}">
+        <Declaration><![CDATA[(*
+
+## Short summary
+
+Function to calculate the height of a tree, as its a balanced binary tree, is defined as 
+height := log\ :sub:`2`\(Nodeamount) (Truncated)
+log\ :sub:`2`\(x) := log(x)/log(2)
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[treeHeight := log2(THIS^.size);
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="BalancedBinarySearchTree">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.adaptBalanceAfterDoubleRotation">
+      <LineId Id="33" Count="0" />
+      <LineId Id="32" Count="0" />
+      <LineId Id="31" Count="0" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="12" Count="1" />
+      <LineId Id="15" Count="2" />
+      <LineId Id="19" Count="2" />
+      <LineId Id="18" Count="0" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="65" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.announceChange">
+      <LineId Id="7" Count="0" />
+      <LineId Id="6" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.checkLeftRotation">
+      <LineId Id="108" Count="19" />
+      <LineId Id="87" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.checkRightRotation">
+      <LineId Id="142" Count="19" />
+      <LineId Id="121" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.clear">
+      <LineId Id="175" Count="0" />
+      <LineId Id="26" Count="0" />
+      <LineId Id="83" Count="0" />
+      <LineId Id="113" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.clearContents">
+      <LineId Id="1" Count="2" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.clone">
+      <LineId Id="503" Count="2" />
+      <LineId Id="522" Count="0" />
+      <LineId Id="506" Count="4" />
+      <LineId Id="520" Count="1" />
+      <LineId Id="524" Count="0" />
+      <LineId Id="515" Count="0" />
+      <LineId Id="523" Count="0" />
+      <LineId Id="519" Count="0" />
+      <LineId Id="518" Count="0" />
+      <LineId Id="124" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.compareNodes">
+      <LineId Id="5" Count="0" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="10" Count="1" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="45" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.compareTo">
+      <LineId Id="34" Count="0" />
+      <LineId Id="76" Count="0" />
+      <LineId Id="69" Count="0" />
+      <LineId Id="77" Count="0" />
+      <LineId Id="80" Count="0" />
+      <LineId Id="78" Count="0" />
+      <LineId Id="81" Count="0" />
+      <LineId Id="79" Count="0" />
+      <LineId Id="74" Count="1" />
+      <LineId Id="71" Count="1" />
+      <LineId Id="70" Count="0" />
+      <LineId Id="73" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.containsEqualObject">
+      <LineId Id="63" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.containsObject">
+      <LineId Id="32" Count="0" />
+      <LineId Id="160" Count="1" />
+      <LineId Id="163" Count="0" />
+      <LineId Id="162" Count="0" />
+      <LineId Id="123" Count="0" />
+      <LineId Id="65" Count="0" />
+      <LineId Id="68" Count="0" />
+      <LineId Id="70" Count="0" />
+      <LineId Id="72" Count="1" />
+      <LineId Id="75" Count="1" />
+      <LineId Id="74" Count="0" />
+      <LineId Id="78" Count="2" />
+      <LineId Id="82" Count="0" />
+      <LineId Id="84" Count="0" />
+      <LineId Id="81" Count="0" />
+      <LineId Id="125" Count="0" />
+      <LineId Id="164" Count="0" />
+      <LineId Id="71" Count="0" />
+      <LineId Id="126" Count="0" />
+      <LineId Id="69" Count="0" />
+      <LineId Id="85" Count="0" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.createNewIterator">
+      <LineId Id="1" Count="7" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.dec">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.decrementSize">
+      <LineId Id="5" Count="0" />
+      <LineId Id="32" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.deepClone">
+      <LineId Id="1" Count="15" />
+      <LineId Id="24" Count="1" />
+      <LineId Id="18" Count="0" />
+      <LineId Id="23" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.destructNodeAndAllChilds">
+      <LineId Id="220" Count="19" />
+      <LineId Id="174" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.FB_Exit">
+      <LineId Id="1" Count="1" />
+      <LineId Id="5" Count="8" />
+      <LineId Id="17" Count="4" />
+      <LineId Id="24" Count="6" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="31" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.FB_init">
+      <LineId Id="47" Count="0" />
+      <LineId Id="142" Count="0" />
+      <LineId Id="192" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.getClonedComparator">
+      <LineId Id="85" Count="32" />
+      <LineId Id="84" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.getClonedEmptyTree">
+      <LineId Id="145" Count="8" />
+      <LineId Id="155" Count="0" />
+      <LineId Id="132" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.getEqualObject">
+      <LineId Id="1" Count="20" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.getInorderSuccessor">
+      <LineId Id="161" Count="0" />
+      <LineId Id="324" Count="0" />
+      <LineId Id="329" Count="0" />
+      <LineId Id="326" Count="0" />
+      <LineId Id="325" Count="0" />
+      <LineId Id="330" Count="0" />
+      <LineId Id="333" Count="3" />
+      <LineId Id="91" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.getSmallestNode">
+      <LineId Id="5" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="231" Count="1" />
+      <LineId Id="240" Count="1" />
+      <LineId Id="239" Count="0" />
+      <LineId Id="234" Count="0" />
+      <LineId Id="242" Count="0" />
+      <LineId Id="235" Count="2" />
+      <LineId Id="233" Count="0" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="230" Count="0" />
+      <LineId Id="100" Count="0" />
+      <LineId Id="238" Count="0" />
+      <LineId Id="186" Count="0" />
+      <LineId Id="188" Count="0" />
+      <LineId Id="18" Count="3" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="55" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.inc">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.incrementSize">
+      <LineId Id="5" Count="0" />
+      <LineId Id="33" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.insert">
+      <LineId Id="14" Count="0" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="1" Count="12" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.insertCollection">
+      <LineId Id="1" Count="3" />
+      <LineId Id="89" Count="0" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="58" Count="1" />
+      <LineId Id="61" Count="0" />
+      <LineId Id="60" Count="0" />
+      <LineId Id="50" Count="1" />
+      <LineId Id="53" Count="0" />
+      <LineId Id="52" Count="0" />
+      <LineId Id="54" Count="3" />
+      <LineId Id="6" Count="3" />
+      <LineId Id="11" Count="1" />
+      <LineId Id="14" Count="2" />
+      <LineId Id="62" Count="0" />
+      <LineId Id="17" Count="5" />
+      <LineId Id="64" Count="0" />
+      <LineId Id="66" Count="0" />
+      <LineId Id="69" Count="0" />
+      <LineId Id="76" Count="0" />
+      <LineId Id="68" Count="0" />
+      <LineId Id="70" Count="1" />
+      <LineId Id="67" Count="0" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="72" Count="0" />
+      <LineId Id="29" Count="4" />
+      <LineId Id="75" Count="0" />
+      <LineId Id="36" Count="1" />
+      <LineId Id="73" Count="0" />
+      <LineId Id="90" Count="0" />
+      <LineId Id="77" Count="4" />
+      <LineId Id="74" Count="0" />
+      <LineId Id="83" Count="4" />
+      <LineId Id="94" Count="0" />
+      <LineId Id="88" Count="0" />
+      <LineId Id="91" Count="2" />
+      <LineId Id="38" Count="10" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.instantInsertCollection">
+      <LineId Id="3" Count="0" />
+      <LineId Id="6" Count="0" />
+      <LineId Id="11" Count="1" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="34" Count="3" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="7" Count="0" />
+      <LineId Id="4" Count="0" />
+      <LineId Id="15" Count="1" />
+      <LineId Id="18" Count="2" />
+      <LineId Id="40" Count="0" />
+      <LineId Id="21" Count="0" />
+      <LineId Id="17" Count="0" />
+      <LineId Id="22" Count="2" />
+      <LineId Id="32" Count="0" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="33" Count="0" />
+      <LineId Id="44" Count="1" />
+      <LineId Id="47" Count="2" />
+      <LineId Id="77" Count="0" />
+      <LineId Id="65" Count="0" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="66" Count="1" />
+      <LineId Id="71" Count="5" />
+      <LineId Id="69" Count="1" />
+      <LineId Id="63" Count="1" />
+      <LineId Id="61" Count="0" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.instantIntersect">
+      <LineId Id="1" Count="0" />
+      <LineId Id="3" Count="0" />
+      <LineId Id="60" Count="3" />
+      <LineId Id="59" Count="0" />
+      <LineId Id="7" Count="6" />
+      <LineId Id="56" Count="0" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="4" Count="0" />
+      <LineId Id="16" Count="1" />
+      <LineId Id="25" Count="4" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="41" Count="2" />
+      <LineId Id="40" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="36" Count="0" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="44" Count="2" />
+      <LineId Id="31" Count="0" />
+      <LineId Id="33" Count="2" />
+      <LineId Id="18" Count="0" />
+      <LineId Id="51" Count="2" />
+      <LineId Id="58" Count="0" />
+      <LineId Id="57" Count="0" />
+      <LineId Id="47" Count="0" />
+      <LineId Id="54" Count="0" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.instantMerge">
+      <LineId Id="3" Count="0" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.instantSubtract">
+      <LineId Id="1" Count="0" />
+      <LineId Id="6" Count="0" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="7" Count="0" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="40" Count="1" />
+      <LineId Id="38" Count="1" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="18" Count="1" />
+      <LineId Id="35" Count="0" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="26" Count="0" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="36" Count="0" />
+      <LineId Id="31" Count="0" />
+      <LineId Id="27" Count="0" />
+      <LineId Id="33" Count="1" />
+      <LineId Id="24" Count="0" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="4" Count="0" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.intersect">
+      <LineId Id="100" Count="0" />
+      <LineId Id="111" Count="0" />
+      <LineId Id="115" Count="0" />
+      <LineId Id="117" Count="0" />
+      <LineId Id="207" Count="4" />
+      <LineId Id="206" Count="0" />
+      <LineId Id="142" Count="0" />
+      <LineId Id="144" Count="0" />
+      <LineId Id="149" Count="0" />
+      <LineId Id="145" Count="1" />
+      <LineId Id="148" Count="0" />
+      <LineId Id="143" Count="0" />
+      <LineId Id="131" Count="0" />
+      <LineId Id="126" Count="0" />
+      <LineId Id="202" Count="0" />
+      <LineId Id="204" Count="1" />
+      <LineId Id="203" Count="0" />
+      <LineId Id="133" Count="0" />
+      <LineId Id="150" Count="1" />
+      <LineId Id="156" Count="0" />
+      <LineId Id="155" Count="0" />
+      <LineId Id="153" Count="0" />
+      <LineId Id="136" Count="0" />
+      <LineId Id="157" Count="0" />
+      <LineId Id="161" Count="0" />
+      <LineId Id="158" Count="0" />
+      <LineId Id="160" Count="0" />
+      <LineId Id="159" Count="0" />
+      <LineId Id="137" Count="0" />
+      <LineId Id="162" Count="0" />
+      <LineId Id="165" Count="0" />
+      <LineId Id="163" Count="1" />
+      <LineId Id="167" Count="0" />
+      <LineId Id="169" Count="1" />
+      <LineId Id="172" Count="0" />
+      <LineId Id="174" Count="1" />
+      <LineId Id="177" Count="0" />
+      <LineId Id="173" Count="0" />
+      <LineId Id="171" Count="0" />
+      <LineId Id="176" Count="0" />
+      <LineId Id="178" Count="2" />
+      <LineId Id="184" Count="0" />
+      <LineId Id="188" Count="5" />
+      <LineId Id="187" Count="0" />
+      <LineId Id="194" Count="0" />
+      <LineId Id="185" Count="1" />
+      <LineId Id="168" Count="0" />
+      <LineId Id="166" Count="0" />
+      <LineId Id="181" Count="1" />
+      <LineId Id="195" Count="0" />
+      <LineId Id="183" Count="0" />
+      <LineId Id="138" Count="0" />
+      <LineId Id="116" Count="0" />
+      <LineId Id="113" Count="0" />
+      <LineId Id="118" Count="0" />
+      <LineId Id="114" Count="0" />
+      <LineId Id="112" Count="0" />
+      <LineId Id="101" Count="1" />
+      <LineId Id="95" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.iterate">
+      <LineId Id="555" Count="0" />
+      <LineId Id="557" Count="0" />
+      <LineId Id="573" Count="0" />
+      <LineId Id="619" Count="0" />
+      <LineId Id="576" Count="0" />
+      <LineId Id="579" Count="0" />
+      <LineId Id="584" Count="0" />
+      <LineId Id="586" Count="0" />
+      <LineId Id="588" Count="1" />
+      <LineId Id="575" Count="0" />
+      <LineId Id="596" Count="6" />
+      <LineId Id="594" Count="0" />
+      <LineId Id="590" Count="2" />
+      <LineId Id="607" Count="0" />
+      <LineId Id="605" Count="0" />
+      <LineId Id="620" Count="1" />
+      <LineId Id="623" Count="1" />
+      <LineId Id="622" Count="0" />
+      <LineId Id="608" Count="6" />
+      <LineId Id="617" Count="0" />
+      <LineId Id="625" Count="0" />
+      <LineId Id="618" Count="0" />
+      <LineId Id="606" Count="0" />
+      <LineId Id="574" Count="0" />
+      <LineId Id="266" Count="1" />
+      <LineId Id="554" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.maxCycleCompares.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.maxCycleCompares.Set">
+      <LineId Id="1" Count="5" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.merge">
+      <LineId Id="1" Count="3" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.recursivInsert">
+      <LineId Id="350" Count="8" />
+      <LineId Id="405" Count="0" />
+      <LineId Id="404" Count="0" />
+      <LineId Id="359" Count="0" />
+      <LineId Id="361" Count="42" />
+      <LineId Id="326" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.recursivRemove">
+      <LineId Id="286" Count="43" />
+      <LineId Id="22" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.recursivSearchSuccessor">
+      <LineId Id="5" Count="0" />
+      <LineId Id="36" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="17" Count="0" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="18" Count="0" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="19" Count="3" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="78" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.remove">
+      <LineId Id="1" Count="12" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.reorganizeLeftRotate">
+      <LineId Id="206" Count="0" />
+      <LineId Id="93" Count="0" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="32" Count="0" />
+      <LineId Id="34" Count="0" />
+      <LineId Id="128" Count="0" />
+      <LineId Id="35" Count="2" />
+      <LineId Id="41" Count="0" />
+      <LineId Id="43" Count="1" />
+      <LineId Id="165" Count="0" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="47" Count="2" />
+      <LineId Id="51" Count="6" />
+      <LineId Id="33" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.reorganizeRightRotate">
+      <LineId Id="105" Count="1" />
+      <LineId Id="49" Count="0" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="62" Count="0" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="18" Count="2" />
+      <LineId Id="27" Count="0" />
+      <LineId Id="21" Count="0" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="63" Count="0" />
+      <LineId Id="24" Count="2" />
+      <LineId Id="22" Count="0" />
+      <LineId Id="28" Count="8" />
+      <LineId Id="104" Count="0" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="107" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.root.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.root.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.rotateLeft">
+      <LineId Id="23" Count="0" />
+      <LineId Id="13" Count="2" />
+      <LineId Id="55" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.rotateRight">
+      <LineId Id="23" Count="0" />
+      <LineId Id="13" Count="2" />
+      <LineId Id="55" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.searchSuccessor">
+      <LineId Id="31" Count="0" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="12" Count="4" />
+      <LineId Id="26" Count="0" />
+      <LineId Id="17" Count="0" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="67" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.set.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.setNodeComparator">
+      <LineId Id="1" Count="6" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.size.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.subtract">
+      <LineId Id="2" Count="40" />
+      <LineId Id="45" Count="20" />
+      <LineId Id="69" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.tree.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTree.treeHeight.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

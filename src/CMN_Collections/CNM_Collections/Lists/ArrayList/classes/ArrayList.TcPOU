@@ -1,0 +1,2058 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="ArrayList" Id="{5fbeb062-03e0-4ffc-819d-a8862a1a41d5}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Implementation of IArrayList.
+Does not allow null objects as data! Object is not null if isObjectValid is true.
+Efficient if size stays small and index operations need to be performed in O(1).
+
+**Warning:**
+	Calling __DELETE directly on a Collection will bypass the destruct Context and therefore also delete the contained elements.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK ArrayList EXTENDS AbstractList IMPLEMENTS CNM_CollectionInterfaces.IArrayList
+VAR
+	(*the container where the elements are stored*)
+	container					:POINTER TO CNM_AbstractObject.IObject;
+	(*how many space does the container has, NOT how many places are currently taken*)
+	currentContainerCapacity	:UDINT;
+	(*the sorter used to sort the list*) 
+	injectedSorter				:CNM_CollectionInterfaces.IArrayListSorter;
+	(*true if the sorter was created inside this list, false if set from outside*)
+	privateSorter				:BOOL;
+	(* injected resizing strategy *)
+	injectedResizingStrategy :CNM_CollectionInterfaces.IResizingStrategy;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="IIndexable" Id="{a4758d1c-4918-4880-8a16-c25626fbaab8}" />
+    <Folder Name="IInvertable" Id="{612d19f4-be0e-4eb5-bee2-26c93b58f323}" />
+    <Folder Name="IList" Id="{bef4594f-65f2-473c-99e7-ef2a61fa4749}">
+      <Folder Name="ICollection" Id="{bb597ada-84a7-416a-a563-43fb8ad10f0a}" />
+    </Folder>
+    <Folder Name="Internal" Id="{9c7c295b-c23c-42e0-8576-b208fcfdd373}" />
+    <Folder Name="IObject" Id="{6f2ae89c-9506-4896-a475-6de00d11877b}" />
+    <Folder Name="ISortable" Id="{d05786dc-f05e-4d27-aea3-7eb4ac53e993}" />
+    <Folder Name="Protected" Id="{e27ea716-3516-4f42-8d25-5487ec4216f5}">
+      <Folder Name="AbstractCollection" Id="{bd61b64b-d76b-4de2-a7d0-7015da4b574d}" />
+    </Folder>
+    <Method Name="announceListChange" Id="{002e30d0-171d-41c2-b4f9-bc820a234133}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called every time the list changes and can notify other components.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED announceListChange
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.changesToCollection := THIS^.changesToCollection+1;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="append" Id="{9bdfa1e9-42c9-4ddb-af81-427c2fbcd7b4}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds the given object to the end of the list.
+Adding NULL-Objects or THIS^ to the list is not possible.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: new Container could be allocated and data was copied
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: new Container couldn't be allocated, container left unchanged
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or the list itself was passed
+	
+*)
+METHOD append :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The object to be appended*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[append := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN(THIS^.isEqual(object) OR_ELSE THIS^.isObjectNull(object));
+
+append :=  THIS^.upscaleContainer(1); 
+RETURN(append <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS);
+THIS^.container[THIS^.size] := object;
+THIS^.incrementSize();
+THIS^.announceListChange();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="appendCollection" Id="{95056e4e-c8a5-4596-8c56-a57b0b9cb49e}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds all elements of the given collection to the end of this list.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: new Container not needed / could be allocated and data was copied
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: new Container couldn't be allocated, container left unchanged
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or the list itself was passed
+
+*)
+
+METHOD appendCollection :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The collection to be appended*)
+	collectionToAppend		:CNM_CollectionInterfaces.ICollection;
+END_VAR
+VAR
+	currentIndex 			:UDINT := 0;
+	currentObject 			:CNM_AbstractObject.IObject;
+	iterator				:CNM_CollectionInterfaces.IIterator;
+	arrayListToAppend		:POINTER TO ArrayList;
+	newContainer			:POINTER TO CNM_AbstractObject.IObject;
+	newContainerSize 		:UDINT;
+END_VAR
+VAR CONSTANT
+	REGISTER_SIZE :UDINT := SIZEOF(__XWORD);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[appendCollection := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN(THIS^.isObjectNull(collectionToAppend) OR_ELSE THIS^.isEqual(collectionToAppend));
+appendCollection := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+RETURN (collectionToAppend.size = 0);
+appendCollection := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+THIS^.resizingStrategy.getUpscaledCapacity(requestedSize := THIS^.size + collectionToAppend.size, currentCapacity := THIS^.currentContainerCapacity, newCapacity => newContainerSize);
+newContainer := __NEW(__XWORD, newContainerSize);
+RETURN(newContainer = 0);
+IF (THIS^.size > 0) AND_THEN (Tc2_System.MEMMOVE(newContainer, THIS^.container, THIS^.size * REGISTER_SIZE) = 0) THEN
+	__DELETE(newContainer);
+	RETURN;
+END_IF
+IF (__QUERYPOINTER(collectionToAppend, arrayListToAppend)) THEN
+	IF (Tc2_System.MEMMOVE(ADR(newContainer[THIS^.size]), arrayListToAppend^.container, collectionToAppend.size*REGISTER_SIZE) = 0) THEN
+		__DELETE(newContainer);
+		RETURN;
+	END_IF
+ELSE
+	IF (collectionToAppend.createNewIterator(iterator => iterator) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+		__DELETE(newContainer); 
+		RETURN;
+	END_IF
+	
+	iterator.iterate(execute := FALSE);
+	WHILE (
+		iterator.iterate(execute := TRUE, object => currentObject) 
+		= CNM_ReturnTypes.SingleExecutionState.BUSY
+	) DO
+		newContainer[THIS^.size + currentIndex] := currentObject;
+		currentIndex := (currentIndex + 1);
+	END_WHILE
+	iterator.destruct();
+	IF (currentIndex < collectionToAppend.size) THEN
+		__DELETE(newContainer); 
+		RETURN;
+	END_IF
+END_IF
+__DELETE(THIS^.container);
+THIS^.container := newContainer;
+THIS^.currentContainerCapacity := newContainerSize;
+THIS^.incrementSize(collectionToAppend.size);
+THIS^.announceListChange();
+appendCollection := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{172ac2b6-c420-4e3e-b8c3-25ed6b68797b}" FolderPath="IObject\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{fc2620d7-1e93-4cf7-a255-4f7ad41540fa}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.ArrayList';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clear" Id="{8593bb1d-4dbb-405a-aca8-23bb1949791c}" FolderPath="IList\ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method clears/deletes all clearable data from this object.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD clear
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[__DELETE(THIS^.container);
+THIS^.container := __NEW(__XWORD, 10);	
+
+THIS^.collectionSize := 0;
+THIS^.currentContainerCapacity := 10;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clearContents" Id="{93df0f0c-5ef6-40ce-b5ec-6addefc6bd16}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD PROTECTED clearContents
+VAR CONSTANT
+	(* NULL is a constant which is always 0 *)
+	NULL				:__XWORD := 0;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Tc2_System.MEMSET(THIS^.container, 0, THIS^.size * SIZEOF(__XWORD));
+THIS^.injectedSorter := 0;
+THIS^.injectedResizingStrategy := 0;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clone" Id="{a3815d53-97c1-4bcc-a0e5-7b85d233f684}" FolderPath="IObject\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are not cloned for this there is the method `ICloneable.deepClone`.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+**Attention:** 
+	For derivations: **If a derived class needs ``clone`` this method must be overwritten.**
+	and don't forget the attribute ``{attribute 'enable_dynamic_creation'}``  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support cloning
+
+*)
+METHOD clone : CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject	:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	result :CNM_ReturnTypes.SingleExecutionResult;
+	miniMe :POINTER TO ArrayList;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[clone := CNM_ReturnTypes.CloneResult.FAILED;
+miniMe := __NEW(ArrayList);
+RETURN (miniMe = 0);
+clone := CNM_ReturnTypes.CloneResult.SUCCESS;
+clonedObject := miniMe^;
+IF (miniMe^.appendCollection(THIS^) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+	clonedObject.destruct();
+	clone := CNM_ReturnTypes.CloneResult.FAILED;
+	clonedObject := 0;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="createNewIterator" Id="{0b006ff3-a307-4565-bdbb-7cd4cf5d55a6}" FolderPath="IList\ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns a NEW Iterator instance which can iterate the collection.
+These iterators can be used parallel independend of each other on the same collection.
+
+**Warning:**
+The returned Iterator was created using the __NEW operator and must be destructed to avoid memory leaks!
+
+
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD createNewIterator :CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_OUTPUT
+	(*The new created iterator or null if allocation fails *)
+	iterator	:CNM_CollectionInterfaces.IIterator;
+END_VAR
+VAR
+	newIterator :POINTER TO ForwardArrayListIterator;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[newIterator := __NEW(ForwardArrayListIterator(arrayList := THIS^));
+IF (newIterator = 0) THEN
+	createNewIterator := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	RETURN;
+END_IF
+createNewIterator := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+iterator := newIterator^;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="decrementSize" Id="{ee8474dd-e3bd-41da-a662-6fdf0fda1207}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+reduces the collection size by the number of removed elements.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD PROTECTED decrementSize
+VAR_INPUT
+	numberOfRemovedElements :UDINT := 1;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.collectionSize := THIS^.collectionSize - numberOfRemovedElements;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="deepClone" Id="{c846552d-e4cd-42a3-afd3-5555d193a05b}" FolderPath="IObject\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are cloned too.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+If something goes wrong, then this method must clean up everything
+that has been cloned and free the memory again.
+**The deepClone either works completely, or not at all**
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+**Attention:** 
+	For derivations: **If a derived class needs ``deepClone`` this method must be overwritten.**
+	and don't forget the attribute ``{attribute 'enable_dynamic_creation'}``, even for container content 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support deep cloning
+
+*)
+METHOD deepClone : CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject	: CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	result :CNM_ReturnTypes.SingleExecutionResult;
+	miniMe :POINTER TO ArrayList;
+	newInstance :CNM_CollectionInterfaces.IArrayList;
+	clonedSorter :CNM_CollectionInterfaces.IArrayListSorter;
+	clonedSorterObject :CNM_AbstractObject.IObject;
+	index :UDINT;
+	target :UDINT;
+	tmpObject :CNM_AbstractObject.IObject;
+	currentObject :CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[deepClone := CNM_ReturnTypes.CloneResult.FAILED;
+miniMe := __NEW(ArrayList);
+RETURN (miniMe = 0);
+deepClone := CNM_ReturnTypes.CloneResult.SUCCESS;
+clonedObject := miniMe^;
+newInstance := miniMe^;
+IF (THIS^.size > 0) THEN
+	target := THIS^.size - 1;
+	FOR index := 0 TO target DO
+		currentObject := THIS^.container[index];
+		IF NOT THIS^.isObjectValid(currentObject) THEN
+			deepClone := CNM_ReturnTypes.CloneResult.FAILED;
+			miniMe^.deepDestruct();
+			clonedObject := 0;
+			RETURN;
+		ELSE 
+			deepClone := currentObject.deepClone(clonedObject => tmpObject);
+			IF (deepClone <> CNM_ReturnTypes.CloneResult.SUCCESS) THEN 
+				miniMe^.deepDestruct();
+				clonedObject := 0;
+				RETURN;
+			END_IF
+			IF (miniMe^.append(tmpObject) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+				deepClone := CNM_ReturnTypes.CloneResult.FAILED;
+				miniMe^.deepDestruct();
+				clonedObject := 0;
+				RETURN;
+			END_IF
+		END_IF
+	END_FOR
+END_IF
+	
+RETURN (THIS^.isObjectNull(THIS^.injectedSorter));
+THIS^.injectedSorter.deepClone(clonedObject => clonedSorterObject);
+__QUERYINTERFACE(clonedSorterObject, clonedSorter);
+deepClone := SEL(
+	THIS^.isObjectValid(clonedSorter),
+	CNM_ReturnTypes.CloneResult.FAILED,
+	CNM_ReturnTypes.CloneResult.SUCCESS
+);
+
+IF (THIS^.isObjectNull(clonedSorter)) THEN
+	deepClone := CNM_ReturnTypes.CloneResult.FAILED;
+	miniMe^.deepDestruct();
+	clonedObject := 0;
+	RETURN;
+END_IF
+newInstance.setSorter(sorter := clonedSorter);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="dequeue" Id="{2e39f9f7-b4d4-442f-b3ee-bbe9a505c882}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns the first object in the list and removes it from the list. 
+Can be seen as opposite of prepend.
+**Example:**
+On a list: (Head -->) A B C, list.dequeue will return A.
+**Example 2:**
+If you call prepend(x), a dequeue right after will return x.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD dequeue :CNM_AbstractObject.IObject
+VAR CONSTANT
+	NULL_REFERENCE :__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (THIS^.size = 0) THEN
+	dequeue := NULL_REFERENCE;
+	RETURN;
+END_IF
+dequeue := THIS^.container[0];
+THIS^.leftShiftObjects(1);
+THIS^.decrementSize();
+THIS^.downscaleContainer();
+THIS^.announceListChange();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="destructContents" Id="{c84d7d01-e276-4c3e-a581-907546da355a}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the deepDestruct method and is intended to destruct all contained Objects of the collection. 
+To delete only the collection without deleting all its contents, use destruct() instead of deepDestruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD PROTECTED destructContents
+VAR
+	currentIndex	:__XWORD;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (container <> 0) THEN
+	FOR currentIndex := 0 TO (THIS^.currentContainerCapacity - 1) DO
+		IF THIS^.isObjectValid(THIS^.container[currentIndex]) THEN
+			THIS^.container[currentIndex].deepDestruct();
+		END_IF
+	END_FOR
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="downscaleContainer" Id="{0713cdd3-e3af-4371-8097-b3e4439eb676}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method decreases the container capacity by the current decrease strategy amount.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: new Container could be allocated and data was copied
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: new Container couldn't be allocated, container left unchanged
+
+*)
+
+{info 'add logging if containeralloc fails'}
+METHOD PROTECTED downscaleContainer :CNM_ReturnTypes.SingleExecutionResult;
+VAR
+	newContainer 			:POINTER TO CNM_AbstractObject.IObject;
+	lastContainerCapacity	:UDINT;
+	newContainerCapacity	:UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.resizingStrategy.getDownscaledCapacity(
+		requestedSize := THIS^.size,
+		currentCapacity := THIS^.currentContainerCapacity,
+		newCapacity => newContainerCapacity
+	)
+THEN
+	newContainer := __NEW(__XWORD, newContainerCapacity);
+	IF (newContainer <> 0) THEN
+		IF (THIS^.container <> 0) THEN 
+			IF (THIS^.size > 0) THEN
+				Tc2_System.MEMCPY(newContainer, THIS^.container,  THIS^.size * SIZEOF(__XWORD));
+			END_IF
+			__DELETE(THIS^.container);
+		END_IF
+		THIS^.container := newContainer;
+		downscaleContainer := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+	ELSE
+		THIS^.currentContainerCapacity := lastContainerCapacity;
+		downscaleContainer := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	END_IF
+END_IF
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Exit" Id="{643ce999-46e6-4fbc-a4a0-9c4c7d062cc4}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it staiys in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+VAR
+	currentIndex	:__XWORD;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (container <> 0) THEN
+	FOR currentIndex := 0 TO (THIS^.currentContainerCapacity - 1) DO
+		IF THIS^.isObjectValid(THIS^.container[currentIndex]) THEN
+			THIS^.container[currentIndex].deepDestruct();
+		END_IF
+	END_FOR
+END_IF
+IF (THIS^.container <> 0) THEN
+	__DELETE(container);
+END_IF
+IF THIS^.isObjectValid(THIS^.injectedSorter) THEN
+	 THIS^.injectedSorter.deepDestruct();
+END_IF
+IF THIS^.isObjectValid(THIS^.injectedResizingStrategy) THEN
+	THIS^.injectedResizingStrategy.deepDestruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getIndexOf" Id="{a0a48b8b-c4f8-486a-b583-2b603495eef5}" FolderPath="IIndexable\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns the index of the first object that is equal to the given object.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: Element was found inside the list
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: object could not be found in the list
+	
+*)
+
+METHOD getIndexOf : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*the object to get the index from*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+VAR_OUTPUT
+	(*The index where the first occurence was found, only valid if return value was SUCCESS, else undefined(UDINT#FFFF_FFFF) *)
+	index	:UDINT;
+END_VAR
+VAR
+	currentObject 	:CNM_AbstractObject.IObject;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.iterate(FALSE);
+IF (THIS^.isObjectValid(object)) THEN
+	WHILE (
+		THIS^.iterate(execute := TRUE, object => currentObject) 
+		= CNM_ReturnTypes.SingleExecutionState.BUSY
+	) DO
+		IF (object.isEqual(currentObject)) THEN
+			getIndexOf := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+			RETURN;
+		END_IF
+		index := index +1;
+	END_WHILE
+END_IF
+
+//in case of not found set index to UDINT max 
+index := UDINT#16#FFFF_FFFF;
+getIndexOf := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getObjectAt" Id="{1c98e41c-fb1d-4d26-92bd-538690cac428}" FolderPath="IIndexable\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns the object at the given index.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: index within valid range, object could be retrieved
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: index was out of valid range
+
+*)
+
+METHOD getObjectAt : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*the index to access the object from*)
+	index	:UDINT;
+END_VAR
+VAR_OUTPUT
+	(*The object found at the index, undefined if ERROR*)
+	object	: CNM_AbstractObject.IObject;
+END_VAR
+VAR CONSTANT
+	NULL_REFERENCE :__XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (index >= THIS^.size) THEN
+	getObjectAt := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	object := NULL_REFERENCE;
+	RETURN;
+END_IF
+
+getObjectAt := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+object := THIS^.container[index];
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="incrementSize" Id="{851c245a-88cc-455b-8d21-eab8ffc24855}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Increments the collectionsize by given amount. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD PROTECTED incrementSize
+VAR_INPUT
+	numberOfAddedElements :UDINT := 1;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.collectionSize := (THIS^.collectionSize + numberOfAddedElements);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="insertObjectAt" Id="{bf9a3159-644d-4ba0-a013-00bfedc62519}" FolderPath="IIndexable\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method inserts the given object at the given index. 
+The element that was on this index before is not deleted,
+but instead is shifted right by one position together 
+with the other elements on indices larger than ``index``.
+If ``object`` is not valid, list is left unchanged.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: insert was successful
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: insert failed, because container needs to increase but no memory left or index is not in valid range
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or the list itself was passed
+*)
+
+METHOD insertObjectAt :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*the index to insert the object at*)
+	index	:UDINT;
+	(*the object to be inserted*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[insertObjectAt := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN(THIS^.isObjectNull(object) OR_ELSE THIS^.isEqual(object));
+insertObjectAt := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+RETURN (index > THIS^.size);
+
+IF THIS^.isObjectValid(object) THEN
+	THIS^.upscaleContainer(1);
+	IF (THIS^.rightShiftObjects(index) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+		THIS^.downscaleContainer();
+		RETURN;
+	END_IF
+	THIS^.container[index] := object;
+	THIS^.incrementSize();
+	THIS^.announceListChange();
+	insertObjectAt := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantSorting" Id="{890ed05d-675e-4d5e-8ef1-086b81f8c239}" FolderPath="Internal\">
+      <Declaration><![CDATA[METHOD INTERNAL instantSorting : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	order :SortingOrder;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE order OF
+SortingOrder.ASCENDING:
+	instantSorting := THIS^.sorter.instantSort(
+		size := THIS^.size, 
+		comparator := comparator, 
+		container := THIS^.container, 
+		currentListVersion := THIS^.changesToCollection
+	);
+
+SortingOrder.DESCENDING:
+	instantSorting	:= THIS^.sorter.instantInverseSort(
+		size := THIS^.size, 
+		container := THIS^.container, 
+		currentListVersion := THIS^.changesToCollection
+	);
+	
+END_CASE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="invert" Id="{b3cb071a-361d-4db4-a7f5-b0583409fe0c}" FolderPath="IInvertable\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+Inverts the order of the elements inside the list. 
+Does not apply any kind of sorting, only reverses the elements in the list.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD invert
+VAR
+	firstElement	:UDINT := 0;
+	lastElement		:UDINT := THIS^.size - 1;
+	midLower		:UDINT;
+	midUpper		:UDINT;
+	loop			:UDINT;
+END_VAR
+VAR CONSTANT
+	REGISTER_SIZE :__XWORD := SIZEOF(__XWORD);
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE (THIS^.size) OF
+0,1: RETURN;
+2,3: FastSwap(ADR(THIS^.container[firstElement]), ADR(THIS^.container[lastElement]));RETURN;
+ELSE
+	loop := SHR(THIS^.size, 1);
+	midLower := loop - 1;
+	midUpper := THIS^.size - loop;
+	
+	IF ((loop AND 1) <> 0) THEN
+		FastSwap(ADR(THIS^.container[midLower]), ADR(THIS^.container[midUpper]));
+		loop := loop - 1;
+		midLower := midLower - 1;
+		midUpper := midupper + 1;
+	END_IF;
+	
+	loop := MAX(SHR(loop, 1), 1);	
+END_CASE
+	
+REPEAT
+	FastSwap(ADR(THIS^.container[firstElement]),ADR(THIS^.container[lastElement]));	
+	FastSwap(ADR(THIS^.container[midLower]),ADR(THIS^.container[midUpper]));	
+	midLower := midLower - 1;
+	midUpper := midupper + 1;
+	firstElement := firstElement + 1;
+	lastElement := lastElement - 1; 
+	loop := loop - 1;
+UNTIL (loop = 0) END_REPEAT
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="iterate" Id="{a32ef99e-3f0f-4986-a452-f15fb05ccb7a}" FolderPath="Protected\AbstractCollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns the next object in the list and returns an execution state.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if last object from collection was returned,
+	``ABORTED``: execute has a falling edge during iterate,
+	``BUSY``: When iterate had rising edge on execute and not all objects had been returned yet
+	``IDLE``: iterate not in progress, execute is false and iterate reseted 
+
+*)
+METHOD PROTECTED iterate :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*False to init, True to retrieve next element*)
+	execute	: BOOL;
+END_VAR
+VAR_OUTPUT
+	(*The current element of the iteration*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+VAR_INST
+	lastExecute 	:BOOL;
+	state 			:CNM_ReturnTypes.SingleExecutionState := CNM_ReturnTypes.SingleExecutionState.IDLE;
+	currentIndex	:UDINT;
+	cycleManager 	:CNM_CycleManager.SimpleCycleManager;
+	currentListVersion :__XWORD;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED 	:__XWORD := 0;	
+	INIT 		:DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	ITERATING 	:DINT := INIT +1;
+	ERROR 		:DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (cycleManager.step.current > INIT) THEN
+	cycleManager.assert.bitNumber.x.valueIsEqualTo(
+		currentValue := currentListVersion,
+		expectedValue := THIS^.changesToCollection,
+		message := 'This instance of ArrayList has changed between iterate calls'
+	);
+END_IF
+
+cycleManager(execute := execute);
+CASE cycleManager.step.current OF
+INIT:
+	object := IS_NOT_REFERENCED;
+	currentIndex := 0;
+	currentListVersion := THIS^.changesToCollection;
+	IF (currentIndex < THIS^.size) THEN
+		object := THIS^.container[currentIndex];
+		currentIndex := currentIndex + 1;
+		cycleManager.proceed();
+	ELSE
+		cycleManager.proceedWith(CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS);
+		object := IS_NOT_REFERENCED;
+	END_IF
+ITERATING:
+	IF (currentIndex < THIS^.size) THEN
+		object := THIS^.container[currentIndex];
+		currentIndex := currentIndex + 1;
+	ELSE
+		cycleManager.proceedWith(CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS);
+		object := IS_NOT_REFERENCED;
+	END_IF
+ERROR:
+	object := IS_NOT_REFERENCED;
+END_CASE
+
+iterate := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="leftShiftObjects" Id="{5f4c49f5-78d6-48cc-adc5-02e9dbdc92a3}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method shifts the data in the container to the left at the given index.
+It memsets the free created gap at the end of the container.
+leftShift(0) : A B C D -> B C D
+leftShift(1) : A B C D -> A C D
+leftShift(1, 2) : A B C D -> A D
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: leftshift was successful
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: startindex was either zero ,less than distance or greater thansize, distance greater than size
+
+*)
+
+METHOD PROTECTED leftShiftObjects :CNM_ReturnTypes.SingleExecutionResult;
+VAR_INPUT
+	(*where the leftshift should start, position of the first element which will shift to the left. All elements after this are also shifted by the same amount.*)
+	startIndex :UDINT;
+	(* the size of the gap to be shifted to the left as IObjects *)
+	distance :UDINT := 1;
+END_VAR
+VAR
+	objectsToShift :UDINT;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED 	:USINT := 0;
+	REGISTER_SIZE :UDINT := SIZEOF(__XWORD);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[leftShiftObjects := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+RETURN((distance >= THIS^.size) OR_ELSE (startIndex = 0) OR_ELSE (startIndex < distance) OR_ELSE (THIS^.size < startIndex));
+objectsToShift := THIS^.size - startIndex;
+Tc2_System.MEMMOVE(ADR(THIS^.container[startIndex-distance]), ADR(THIS^.container[startIndex]), objectsToShift * REGISTER_SIZE);
+Tc2_System.MEMSET(ADR(THIS^.container[THIS^.size-distance]), IS_NOT_REFERENCED, distance * REGISTER_SIZE);
+leftShiftObjects := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="pop" Id="{95cb876a-ba7e-423d-828f-2e96444150cb}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns the last object in the list and removes it from the list. 
+Can be seen as opposite of append.
+**Example:**
+On a list: (Head -->) A B C, list.pop will return C.
+**Example 2:**
+If you call append(x), a pop right after will return x.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD pop :CNM_AbstractObject.IObject
+VAR CONSTANT
+	NULL_REFERENCE :__XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (THIS^.size = 0) THEN
+	pop := NULL_REFERENCE;
+	RETURN;
+END_IF
+pop := THIS^.container[THIS^.size-1];
+THIS^.container[THIS^.size-1] := NULL_REFERENCE;
+THIS^.decrementSize();
+THIS^.downscaleContainer();
+THIS^.announceListChange();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="prepend" Id="{7fef7e20-de48-49d1-9ed7-cd3e8e4a9be3}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds the given object to the start of the list.
+Adding NULL-Objects or THIS^ to the list is not possible.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: new Container not needed / could be allocated and data was copied
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: new Container couldn't be allocated, container left unchanged
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or the list itself was passed
+*)
+METHOD prepend :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The object to be prepended*)
+	object	: CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[prepend := THIS^.insertObjectAt(index := 0, object := object);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="prependCollection" Id="{d6ccc62b-06df-49b6-a1dc-2a3c4da4d62e}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds all elements of the given collection to the start of this list. 
+The order is given by the default iterator of the given collection.
+If the collection to prepend is null or contains no element, list is unchanged.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: prepend was successful
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: collection to prepend didn't fit in old container, and new container couldn't be allocated
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or this arraylist was passed
+	
+*)
+METHOD prependCollection :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The collection to be prepended*)
+	collectionToPrepend		:CNM_CollectionInterfaces.ICollection;
+END_VAR
+VAR
+	currentIndex 			:UDINT;
+	currentObject 			:CNM_AbstractObject.IObject;
+	offset 					:__UXINT;
+	iterator				:CNM_CollectionInterfaces.IIterator;
+	newContainer			:POINTER TO CNM_AbstractObject.IObject;
+	arrayListToPrepend		:POINTER TO ArrayList;
+	newContainerSize		:UDINT;
+END_VAR
+VAR CONSTANT
+	REGISTER_SIZE :UDINT := SIZEOF(__XWORD);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[prependCollection := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN(THIS^.isObjectNull(collectionToPrepend) OR_ELSE THIS^.isEqual(collectionToPrepend));
+prependCollection := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+RETURN (collectionToPrepend.size = 0);
+prependCollection := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+THIS^.resizingStrategy.getUpscaledCapacity(requestedSize := THIS^.size + collectionToPrepend.size, currentCapacity := THIS^.currentContainerCapacity, newCapacity => newContainerSize);
+newContainer := __NEW(__XWORD, newContainerSize);
+RETURN(newContainer = 0);
+IF (Tc2_System.MEMMOVE(ADR(newContainer[collectionToPrepend.size]), THIS^.container, THIS^.size * REGISTER_SIZE) = 0) THEN
+	__DELETE(newContainer);
+	RETURN;
+END_IF
+IF (__QUERYPOINTER(collectionToPrepend, arrayListToPrepend)) THEN
+	IF (Tc2_System.MEMMOVE(newContainer, arrayListToPrepend^.container, collectionToPrepend.size*REGISTER_SIZE) = 0) THEN
+		__DELETE(newContainer);
+		RETURN;
+	END_IF
+ELSE
+	IF (collectionToPrepend.createNewIterator(iterator => iterator) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+		__DELETE(newContainer); 
+		RETURN;
+	END_IF
+	
+	iterator.iterate(execute := FALSE);
+	WHILE (
+		iterator.iterate(execute := TRUE, object => currentObject) 
+		= CNM_ReturnTypes.SingleExecutionState.BUSY
+	) DO
+		newContainer[currentIndex] := currentObject;
+		currentIndex := (currentIndex + 1);
+	END_WHILE
+	iterator.destruct();
+	IF (currentIndex < collectionToPrepend.size) THEN
+		__DELETE(newContainer); 
+		RETURN;
+	END_IF
+END_IF
+__DELETE(THIS^.container);
+THIS^.container := newContainer;
+THIS^.currentContainerCapacity := newContainerSize;
+THIS^.incrementSize(collectionToPrepend.size);
+THIS^.announceListChange();
+prependCollection := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="remove" Id="{ea478636-b6fb-457a-91df-9ecdb3fd8ba2}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method removes the first instance of the given object from the list.
+Passing a null object leaves the list unchanged.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD remove
+VAR_INPUT
+	(*The object to be removed from the list*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	index :UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF(THIS^.getIndexOf(object, index => index) = CNM_ReturnTypes.SingleExecutionResult.SUCCESS)THEN
+	THIS^.removeObjectAt(index);
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="removeObjectAt" Id="{98892210-2800-49e9-8333-52bf8c60fbdd}" FolderPath="IIndexable\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method removes the element at the given index from the list (does not destruct it!).
+Elements right from the object are shifted to close the gap.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: remove was successful
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: index out of bounds
+
+*)
+METHOD removeObjectAt :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*the index to remove the object from*)
+	index	:UDINT;
+END_VAR
+VAR_OUTPUT
+	(*the removed object*)
+	object :CNM_AbstractObject.IObject;
+END_VAR
+VAR CONSTANT
+	NULL_REFERENCE :__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[removeObjectAt := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+RETURN (index >= THIS^.size);
+
+removeObjectAt := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+THIS^.getObjectAt(index := index, object => object);
+//return from leftShiftObjects unconsiderd as lack of memory isn't an error for remove
+THIS^.leftShiftObjects(index+1);
+THIS^.decrementSize();
+THIS^.downscaleContainer();
+THIS^.announceListChange();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="replaceObjectAt" Id="{39a73faf-11ee-4c1d-9f67-fe06a531388f}" FolderPath="IIndexable\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method replaces the object inside the collection at the given index with the given object.
+
+Replacing with NULL does not affect the list.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: index was valid and object at index replaced with given object
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: index was invalid or object NULL, nothing changed
+
+
+*)
+
+METHOD replaceObjectAt :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT	
+	(*the index to replace the object at*)
+	index :UDINT;
+	(*the object to be at this index instead*)
+	withObject :CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[replaceObjectAt := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+RETURN (index >= THIS^.size);
+
+IF (THIS^.isObjectValid(withObject)) THEN
+	THIS^.container[index] := withObject;
+	replaceObjectAt := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+	THIS^.announceListChange();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="resizingStrategy" Id="{cd508ad2-7499-49c9-87c1-0de54522d278}" FolderPath="IIndexable\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property can be used to inject a customized resizing strategy for arrays and containers. 
+The getter returns the currently used strategy as a fluent interface.
+If no custom strategy is set, a default strategy will be used. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY resizingStrategy : CNM_CollectionInterfaces.IResizingStrategy
+]]></Declaration>
+      <Get Name="Get" Id="{7bb6ad41-e4fa-44a5-a1bb-cbeea1b53fe8}">
+        <Declaration><![CDATA[VAR_STAT
+	defaultStrategy :CubicRootResizing;
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF THIS^.isObjectValid(THIS^.injectedResizingStrategy) THEN
+	resizingStrategy := THIS^.injectedResizingStrategy;
+ELSE
+	resizingStrategy := defaultStrategy;
+END_IF
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{13a5f149-62a4-43bf-adf7-4c9d4cffac9f}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.injectedResizingStrategy := resizingStrategy;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="rightShiftObjects" Id="{751ccb6f-d987-40df-a82a-eb8c9a207e9c}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method shifts all ojects in the container from startIndex to size - 1 to the right.
+Ensure that the container has sufficient space to perform the shift, otherwise it will return ERROR.
+rightShift(0) : A B C D -> _ A B C D
+
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: rightshift was successful
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: startindex behind last object or not enough space inside the container. 
+
+*)
+
+METHOD PROTECTED rightShiftObjects :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(* the index of the first element which will be shifted *)
+	startIndex 	:UDINT;
+	distance 	:UDINT := 1;
+END_VAR
+VAR
+	offset 				:UDINT;
+	length 				:UDINT;
+	objectsToShift		:UDINT;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED 	:USINT := 0;
+	REGISTER_SIZE :UDINT := SIZEOF(__XWORD);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[rightShiftObjects := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+RETURN((startIndex > THIS^.size) OR_ELSE (distance > THIS^.currentContainerCapacity - THIS^.size ));
+rightShiftObjects := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+objectsToShift := THIS^.size - startIndex;
+RETURN(objectsToShift = 0);
+Tc2_System.MEMMOVE(ADR(THIS^.container[startIndex+distance]), ADR(THIS^.container[startIndex]), objectsToShift * REGISTER_SIZE);
+Tc2_System.MEMSET(ADR(THIS^.container[startIndex]), IS_NOT_REFERENCED, distance * REGISTER_SIZE);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="setSorter" Id="{cdd2f4c7-f2ff-46e2-8196-57676df906e7}" FolderPath="ISortable\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method can replace the default sorter for a custom one. Check ``IListSorter`` and ``IArrayListSorter``
+
+.. warning
+	If the a dynamic instance of an injected sorter already exists, it will be destructed.
+	
+.. warning
+	If the injected sorter was created dynamically,
+	it will be automatically destruced within the destruct context of THIS list.
+	
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``THIS`` :``ISortable``
+
+*)
+METHOD setSorter :CNM_CollectionInterfaces.ISortable
+VAR_INPUT
+	(*The instance of the sorter to be used to sort the list*)
+	sorter	:CNM_CollectionInterfaces.IArrayListSorter;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.injectedSorter := sorter;
+setSorter := THIS^.sort;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="sorter" Id="{9dcc2190-a2d8-4eed-add4-821e45c5c8ae}" FolderPath="Protected\">
+      <Declaration><![CDATA[PROPERTY PROTECTED sorter :CNM_CollectionInterfaces.IArrayListSorter]]></Declaration>
+      <Get Name="Get" Id="{918965a1-10b3-4c7b-a378-b1edba87b23c}">
+        <Declaration><![CDATA[VAR_INST
+	instSorter :ArrayListShellSorter;
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF(THIS^.isObjectValid(THIS^.injectedSorter))THEN
+	sorter := THIS^.injectedSorter;
+ELSE
+	sorter := instSorter;
+END_IF
+
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="sorting" Id="{97f86a19-3cf4-4479-bd5b-3a677ebf996b}" FolderPath="Internal\">
+      <Declaration><![CDATA[METHOD INTERNAL sorting : CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	execute :BOOL;
+	order :SortingOrder;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE order OF
+SortingOrder.ASCENDING:
+	sorting := THIS^.sorter.sort(
+		execute := execute, 
+		size := THIS^.size, 
+		comparator := comparator, 
+		container := THIS^.container, 
+		currentListVersion := THIS^.changesToCollection
+	);
+
+SortingOrder.DESCENDING:
+	sorting	:= THIS^.sorter.inverseSort(
+		execute := execute, 
+		size := THIS^.size, 
+		container := THIS^.container, 
+		currentListVersion := THIS^.changesToCollection
+	);
+	
+END_CASE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="upscaleContainer" Id="{1046149d-5f25-402d-a040-f234cf33a6f5}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method increases the container to have at least ``space`` more capacity.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: new container could be allocated and data was transferd
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: allocation of new container failed
+
+*)
+
+{info 'add logging if allocation fails'}
+
+METHOD PROTECTED upscaleContainer :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The amount of storagecapacity that should be added*)
+	space 					:UDINT;
+END_VAR
+VAR
+	newContainer			:POINTER TO CNM_AbstractObject.IObject;
+	lastContainerCapacity	:UDINT;
+	newContainerCapacity	:UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[lastContainerCapacity := THIS^.currentContainerCapacity;
+
+IF THIS^.resizingStrategy.getUpscaledCapacity(
+		requestedSize := THIS^.size + space,
+		currentCapacity := THIS^.currentContainerCapacity,
+		newCapacity => newContainerCapacity
+	)
+THEN
+	newContainer := __NEW(__XWORD, newContainerCapacity);
+	IF (newContainer <> 0) THEN
+		IF (THIS^.size > 0) AND_THEN (THIS^.container <> 0) THEN
+			Tc2_System.MEMMOVE(newContainer, THIS^.container, THIS^.size * SIZEOF(__XWORD));
+			__DELETE(THIS^.container);
+		END_IF;
+		THIS^.container := newContainer;
+		upscaleContainer := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+		THIS^.currentContainerCapacity := newContainerCapacity;
+	ELSE
+		THIS^.currentContainerCapacity := lastContainerCapacity;
+		upscaleContainer := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	END_IF
+ELSE 
+	upscaleContainer := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="ArrayList">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.announceListChange">
+      <LineId Id="62" Count="0" />
+      <LineId Id="34" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.append">
+      <LineId Id="182" Count="1" />
+      <LineId Id="185" Count="1" />
+      <LineId Id="194" Count="0" />
+      <LineId Id="189" Count="0" />
+      <LineId Id="191" Count="1" />
+      <LineId Id="181" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.appendCollection">
+      <LineId Id="558" Count="0" />
+      <LineId Id="649" Count="1" />
+      <LineId Id="559" Count="0" />
+      <LineId Id="652" Count="0" />
+      <LineId Id="603" Count="2" />
+      <LineId Id="613" Count="27" />
+      <LineId Id="642" Count="2" />
+      <LineId Id="647" Count="1" />
+      <LineId Id="651" Count="0" />
+      <LineId Id="608" Count="0" />
+      <LineId Id="179" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.className.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.clear">
+      <LineId Id="133" Count="1" />
+      <LineId Id="137" Count="0" />
+      <LineId Id="54" Count="0" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="142" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.clearContents">
+      <LineId Id="1" Count="0" />
+      <LineId Id="3" Count="0" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.clone">
+      <LineId Id="22" Count="4" />
+      <LineId Id="33" Count="0" />
+      <LineId Id="28" Count="3" />
+      <LineId Id="11" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.createNewIterator">
+      <LineId Id="9" Count="5" />
+      <LineId Id="17" Count="0" />
+      <LineId Id="8" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.decrementSize">
+      <LineId Id="26" Count="1" />
+    </LineIds>
+    <LineIds Name="ArrayList.deepClone">
+      <LineId Id="36" Count="8" />
+      <LineId Id="75" Count="0" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="81" Count="2" />
+      <LineId Id="80" Count="0" />
+      <LineId Id="77" Count="0" />
+      <LineId Id="85" Count="1" />
+      <LineId Id="89" Count="1" />
+      <LineId Id="87" Count="1" />
+      <LineId Id="91" Count="0" />
+      <LineId Id="46" Count="3" />
+      <LineId Id="92" Count="0" />
+      <LineId Id="50" Count="19" />
+      <LineId Id="35" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.dequeue">
+      <LineId Id="30" Count="5" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="29" Count="0" />
+      <LineId Id="36" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.destructContents">
+      <LineId Id="1" Count="7" />
+    </LineIds>
+    <LineIds Name="ArrayList.downscaleContainer">
+      <LineId Id="18" Count="0" />
+      <LineId Id="20" Count="4" />
+      <LineId Id="26" Count="0" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="36" Count="1" />
+      <LineId Id="29" Count="0" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="31" Count="4" />
+      <LineId Id="27" Count="0" />
+      <LineId Id="25" Count="0" />
+      <LineId Id="40" Count="0" />
+      <LineId Id="13" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.FB_Exit">
+      <LineId Id="1" Count="16" />
+    </LineIds>
+    <LineIds Name="ArrayList.getIndexOf">
+      <LineId Id="146" Count="1" />
+      <LineId Id="228" Count="0" />
+      <LineId Id="236" Count="2" />
+      <LineId Id="229" Count="4" />
+      <LineId Id="226" Count="1" />
+      <LineId Id="154" Count="1" />
+      <LineId Id="191" Count="0" />
+      <LineId Id="156" Count="0" />
+      <LineId Id="81" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.getObjectAt">
+      <LineId Id="143" Count="4" />
+      <LineId Id="225" Count="0" />
+      <LineId Id="150" Count="0" />
+      <LineId Id="226" Count="0" />
+      <LineId Id="73" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.incrementSize">
+      <LineId Id="2" Count="0" />
+      <LineId Id="42" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.insertObjectAt">
+      <LineId Id="270" Count="1" />
+      <LineId Id="136" Count="0" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="263" Count="0" />
+      <LineId Id="256" Count="0" />
+      <LineId Id="264" Count="0" />
+      <LineId Id="257" Count="0" />
+      <LineId Id="266" Count="0" />
+      <LineId Id="268" Count="0" />
+      <LineId Id="267" Count="0" />
+      <LineId Id="259" Count="0" />
+      <LineId Id="265" Count="0" />
+      <LineId Id="261" Count="0" />
+      <LineId Id="269" Count="0" />
+      <LineId Id="255" Count="0" />
+      <LineId Id="262" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.instantSorting">
+      <LineId Id="1" Count="17" />
+    </LineIds>
+    <LineIds Name="ArrayList.invert">
+      <LineId Id="88" Count="2" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="141" Count="10" />
+      <LineId Id="140" Count="0" />
+      <LineId Id="91" Count="0" />
+      <LineId Id="109" Count="1" />
+      <LineId Id="128" Count="0" />
+      <LineId Id="134" Count="0" />
+      <LineId Id="130" Count="0" />
+      <LineId Id="135" Count="3" />
+      <LineId Id="125" Count="0" />
+      <LineId Id="85" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.iterate">
+      <LineId Id="58" Count="6" />
+      <LineId Id="57" Count="0" />
+      <LineId Id="36" Count="0" />
+      <LineId Id="42" Count="1" />
+      <LineId Id="48" Count="1" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="68" Count="2" />
+      <LineId Id="74" Count="0" />
+      <LineId Id="71" Count="2" />
+      <LineId Id="67" Count="0" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="50" Count="5" />
+      <LineId Id="47" Count="0" />
+      <LineId Id="65" Count="1" />
+      <LineId Id="44" Count="0" />
+      <LineId Id="31" Count="2" />
+    </LineIds>
+    <LineIds Name="ArrayList.leftShiftObjects">
+      <LineId Id="231" Count="2" />
+      <LineId Id="123" Count="0" />
+      <LineId Id="238" Count="0" />
+      <LineId Id="236" Count="0" />
+      <LineId Id="235" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.pop">
+      <LineId Id="30" Count="6" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="29" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.prepend">
+      <LineId Id="93" Count="0" />
+      <LineId Id="59" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.prependCollection">
+      <LineId Id="801" Count="0" />
+      <LineId Id="804" Count="0" />
+      <LineId Id="713" Count="1" />
+      <LineId Id="807" Count="0" />
+      <LineId Id="759" Count="0" />
+      <LineId Id="761" Count="1" />
+      <LineId Id="766" Count="27" />
+      <LineId Id="795" Count="2" />
+      <LineId Id="800" Count="0" />
+      <LineId Id="805" Count="1" />
+      <LineId Id="764" Count="0" />
+      <LineId Id="495" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.remove">
+      <LineId Id="90" Count="0" />
+      <LineId Id="93" Count="0" />
+      <LineId Id="92" Count="0" />
+      <LineId Id="59" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.removeObjectAt">
+      <LineId Id="145" Count="0" />
+      <LineId Id="63" Count="0" />
+      <LineId Id="69" Count="1" />
+      <LineId Id="151" Count="0" />
+      <LineId Id="75" Count="0" />
+      <LineId Id="74" Count="0" />
+      <LineId Id="152" Count="1" />
+      <LineId Id="107" Count="0" />
+      <LineId Id="150" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.replaceObjectAt">
+      <LineId Id="132" Count="0" />
+      <LineId Id="43" Count="0" />
+      <LineId Id="46" Count="1" />
+      <LineId Id="49" Count="0" />
+      <LineId Id="133" Count="0" />
+      <LineId Id="88" Count="0" />
+      <LineId Id="51" Count="0" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.resizingStrategy.Get">
+      <LineId Id="1" Count="5" />
+    </LineIds>
+    <LineIds Name="ArrayList.resizingStrategy.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ArrayList.rightShiftObjects">
+      <LineId Id="100" Count="0" />
+      <LineId Id="210" Count="0" />
+      <LineId Id="212" Count="1" />
+      <LineId Id="216" Count="0" />
+      <LineId Id="214" Count="1" />
+      <LineId Id="211" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.setSorter">
+      <LineId Id="163" Count="0" />
+      <LineId Id="72" Count="0" />
+      <LineId Id="36" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayList.sorter.Get">
+      <LineId Id="2" Count="1" />
+      <LineId Id="8" Count="2" />
+      <LineId Id="13" Count="1" />
+    </LineIds>
+    <LineIds Name="ArrayList.sorting">
+      <LineId Id="1" Count="19" />
+    </LineIds>
+    <LineIds Name="ArrayList.upscaleContainer">
+      <LineId Id="14" Count="0" />
+      <LineId Id="17" Count="1" />
+      <LineId Id="22" Count="4" />
+      <LineId Id="19" Count="0" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="29" Count="1" />
+      <LineId Id="40" Count="0" />
+      <LineId Id="31" Count="1" />
+      <LineId Id="41" Count="0" />
+      <LineId Id="33" Count="5" />
+      <LineId Id="20" Count="0" />
+      <LineId Id="13" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

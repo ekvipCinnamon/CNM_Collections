@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="LinkedListTest" Id="{ac21ad8c-fc97-49b6-a299-c21d3dd3c5c9}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK LinkedListTest EXTENDS CNM_CollectionTestLib.ListInterfaceTest;
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[THIS^.SortAndCheckPreviousElement('SortAndCheckElementPrevious');]]></ST>
+    </Implementation>
+    <Method Name="FB_init" Id="{2a306a8f-5670-4541-bb3d-2ad7e08b6aef}">
+      <Declaration><![CDATA[METHOD FB_init : BOOL
+VAR_INPUT
+    bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+    bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+	(*main list to be tested*)
+	emptyList1 :CNM_CollectionInterfaces.IList;
+	(*secondary list to be tested for appendCollection test*)
+	emptyList2 :CNM_CollectionInterfaces.IList;
+	(*factory needed for forEach tests, not tested*)
+	actionListFactory :CNM_CollectionInterfaces.ICollectionFactory;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.externalList := emptyList1;
+THIS^.externalList2 := emptyList2;
+THIS^.listFactory := actionListFactory;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SortAndCheckPreviousElement" Id="{0d1f3e9d-27c1-4efa-87b3-fcad7c1f3533}">
+      <Declaration><![CDATA[METHOD SortAndCheckPreviousElement
+VAR_INPUT
+	testInstanceIdentifier	:STRING(255);
+END_VAR
+VAR
+	testname				:STRING(255);
+	dequeuedElement			:CNM_AbstractObject.IObject;
+	lastElement				:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	lastElementPrevious		:CNM_AbstractObject.IObject;
+	foo						:CNM_AbstractObject.IObject;
+	comparisonResult		:BOOL;
+	index					:INT;
+END_VAR
+VAR_INST
+	newLinkedList			:CNM_CollectionInterfaces.ILinkedList;
+	specialList				:TestLinkedList;
+	listToSort 				:CNM_CollectionInterfaces.IList;
+	sortState				:CNM_ReturnTypes.SingleExecutionState;
+	sortReady				:BOOL := FALSE;
+	initSuccess				:BOOL := FALSE;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[testname := Tc2_Standard.CONCAT('SortAndCheckElementPrevious', testInstanceIdentifier);
+IF TcUnit.TEST_ORDERED(testname) THEN
+	IF NOT initSuccess THEN
+		IF (listFactory.getNewLinkedList(list => newLinkedList) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+			THIS^.AssertTrue(FALSE, 'Creation of linkedList has failed, test has failed');
+			TcUnit.TEST_FINISHED();
+			RETURN;
+		ELSE
+			listToSort := newLinkedList;
+		END_IF
+		FOR index := 0 TO 999 BY 1 DO
+			foo := testobjectfactory.getNewTestObject(index);
+			listToSort.prepend(foo);
+			specialList.prepend(foo);
+		END_FOR
+		listToSort.sort.ascending(FALSE);
+		initSuccess := TRUE;
+	END_IF
+	IF initSuccess AND_THEN listToSort.sort.ascending(TRUE) = CNM_ReturnTypes.SingleExecutionState.SUCCESS AND sortReady = FALSE THEN
+		sortReady := TRUE;
+	END_IF
+	IF sortReady = TRUE THEN
+		dequeuedElement := listToSort.dequeue();
+		dequeuedElement.destruct();
+		FOR index := 0 TO 998 BY 1 DO
+			dequeuedElement := listToSort.dequeue();
+			lastElement := specialList.getLastElement;
+			lastElementPrevious	:= lastElement.previous.object;
+			comparisonResult := lastElementPrevious.isEqual(dequeuedElement);
+			IF comparisonResult = FALSE THEN
+				AssertFalse(Condition := TRUE, 'the previous element in the list doesn$'t match the element in the special list');
+			END_IF
+			dequeuedElement.destruct();
+			specialList.pop();
+		END_FOR
+		listToSort.deepDestruct();
+		TEST_FINISHED();
+	END_IF
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="LinkedListTest">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedListTest.FB_init">
+      <LineId Id="13" Count="1" />
+      <LineId Id="12" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedListTest.SortAndCheckPreviousElement">
+      <LineId Id="223" Count="2" />
+      <LineId Id="256" Count="0" />
+      <LineId Id="385" Count="0" />
+      <LineId Id="387" Count="3" />
+      <LineId Id="386" Count="0" />
+      <LineId Id="226" Count="1" />
+      <LineId Id="229" Count="0" />
+      <LineId Id="291" Count="0" />
+      <LineId Id="231" Count="0" />
+      <LineId Id="335" Count="0" />
+      <LineId Id="232" Count="2" />
+      <LineId Id="263" Count="0" />
+      <LineId Id="262" Count="0" />
+      <LineId Id="268" Count="0" />
+      <LineId Id="391" Count="11" />
+      <LineId Id="282" Count="0" />
+      <LineId Id="379" Count="0" />
+      <LineId Id="270" Count="1" />
+      <LineId Id="248" Count="0" />
+      <LineId Id="110" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

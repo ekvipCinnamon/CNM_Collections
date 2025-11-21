@@ -1,0 +1,235 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="AbstractArrayListSorter" Id="{6abc3086-fb22-46a7-8a4c-ffa4fcb98b7d}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+The abstract implementation of an ArrayListSorter, to provide default implementations for setting comparator, the IObject methods.
+Provides the default implementation for sort and inverseSort.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+FUNCTION_BLOCK INTERNAL ABSTRACT AbstractArrayListSorter EXTENDS AbstractListSorter IMPLEMENTS CNM_CollectionInterfaces.IArrayListSorter
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="IArrayListSorter" Id="{7db8e8eb-380e-46ca-8382-2b90acb44185}" />
+    <Method Name="instantInverseSort" Id="{435ee9e5-1b42-4aab-8f35-59b2f74abb88}" FolderPath="IArrayListSorter\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure instantly in descending order within one call. 
+It uses the passed Comparator to sort the structure or the compareTo of the contained Objects if no comparator is passed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``ERROR``: Sort was not able to finish 
+	``SUCCESS``: Sorting was finished succesfully
+
+*)
+METHOD instantInverseSort : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The size of the list to be sorted*)
+	size	: UDINT;
+	(*the container, that contains the list elements*)
+	container	: POINTER TO CNM_CollectionInterfaces.CNM_AbstractObject.IObject;
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion	: __XWORD;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.reverseComparator.attachComparator(comparator);
+THIS^.instantSort(size := size, comparator := THIS^.reverseComparator, container := container, currentListVersion := currentListVersion);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantSort" Id="{dd36fde9-4ca6-4c44-a429-60b5c0967cc4}" FolderPath="IArrayListSorter\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure instantly within one call. 
+It uses the passed Comparator to sort the structure or the compareTo of the contained Objects if no comparator is passed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``ERROR``: Sort was not able to finish 
+	``SUCCESS``: Sorting was finished succesfully
+
+*)
+METHOD ABSTRACT instantSort : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The size of the list to be sorted*)
+	size	: UDINT;
+	(*the container, that contains the list elements*)
+	container	: POINTER TO CNM_CollectionInterfaces.CNM_AbstractObject.IObject;
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion	: __XWORD;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="inverseSort" Id="{f5fd32d7-b494-4a85-9f6c-226416cfa6f2}" FolderPath="IArrayListSorter\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method sorts the Sortable in the inverted order, so from great to low
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``ABORTED``: While inverse was pending,execute had a falling edge,
+	``BUSY``: Inverse is in progress
+	``ERROR``: Inverse was not able to finish (p.e. List changed) call inverse(false) to reset
+	``IDLE``: Currently invert is not in progress
+	``SUCCESS``: Inversing was finished 
+*)
+METHOD inverseSort : CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*control bit to start or abort the inverting, needs to be active until the ExecutionState is noz longer busy*)
+	execute	: BOOL;
+	(*The size of the list to be sorted*)
+	size :UDINT;
+	(*the container, that contains the list elements*)
+	container	: POINTER TO CNM_AbstractObject.IObject;
+END_VAR
+VAR_INPUT
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator :CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion :__XWORD;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.reverseComparator.attachComparator(comparator);
+THIS^.sort(execute := execute, size := size, comparator := THIS^.reverseComparator, container := container, currentListVersion := currentListVersion);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="sort" Id="{8ca6e19a-58f2-4a97-9077-d70bd291eb0c}" FolderPath="IArrayListSorter\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure. 
+This can take many cycles and should be called until the CNM_ReturnTypes.ExecutionState is no longer ``BUSY``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``ABORTED``: While sort was pending,execute had a falling edge,
+	``BUSY``: Sort is in progress
+	``ERROR``: Sort was not able to finish (p.e. List changed) call sort(false) to reset
+	``IDLE``: Currently no sort in progress
+	``SUCCESS``: Sorting was finished 
+
+*)
+METHOD ABSTRACT sort :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*control bit to start or abort the sorting, needs to be active until the ExecutionState is SUCCESS*)
+	execute		:BOOL;
+	(*The size of the list to be sorted*)
+	size 		:UDINT;
+	(*the container, that contains the list elements*)
+	container	:POINTER TO CNM_AbstractObject.IObject;
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator :CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion :__XWORD;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="AbstractArrayListSorter">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractArrayListSorter.instantInverseSort">
+      <LineId Id="1" Count="2" />
+    </LineIds>
+    <LineIds Name="AbstractArrayListSorter.instantSort">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractArrayListSorter.inverseSort">
+      <LineId Id="1" Count="2" />
+    </LineIds>
+    <LineIds Name="AbstractArrayListSorter.sort">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

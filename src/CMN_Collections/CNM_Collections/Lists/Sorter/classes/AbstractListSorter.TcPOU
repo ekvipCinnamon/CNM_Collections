@@ -1,0 +1,448 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="AbstractListSorter" Id="{1ae68652-fafd-4467-8ce7-628fb7cca668}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Abstract base class for list sorters. Provides functionality to set the execution limits, size and list changes.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+FUNCTION_BLOCK INTERNAL ABSTRACT AbstractListSorter EXTENDS AbstractDisposableContainer IMPLEMENTS CNM_CollectionInterfaces.IListSorter
+VAR
+	(*The comparator used to sort, set by the List when setting sorter*)
+	elementComparator		:CNM_AbstractObject.IComparator;
+	(*The maximum of comparisons that the sorter allows, may be overwruled by the bounds*)
+	maxOperationsPerCycle 	:UDINT;
+	(*The maximum of compares done per cycle to prevent very long lists to take up to much time*)
+	upperCompareBound 		:UDINT	:= GeneralParameters.DEFAULT_OPERATIONS_PER_CYCLE;
+	(* Comparator used for inverse Sort *)
+	reverseComparator :InvertComparator;
+	(* the current change index of the list *)
+	listChangeIndex :REFERENCE TO __XWORD;
+END_VAR
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="IListSorter" Id="{5d8a602e-bb42-43ef-b295-36f35b16995f}" />
+    <Folder Name="IObject" Id="{f00a2676-1df3-4ec5-9847-db41e89b92d2}" />
+    <Folder Name="Protected" Id="{2bc7f237-1200-4ea0-b781-efac0282ebd8}" />
+    <Property Name="className" Id="{52c74e3a-3c26-46fa-b161-2954521acfb3}" FolderPath="IObject\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY ABSTRACT className	:CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{f22aa5cc-ede7-4438-8e20-86ab35ed6093}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clearContents" Id="{f0d7de1b-de57-47da-b5ae-d60d3f0a1979}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD PROTECTED clearContents
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.elementComparator := 0;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clone" Id="{c7f6ade8-2d2d-4e5c-9d04-486c6806df89}" FolderPath="IObject\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are not cloned for this there is the method `ICloneable.deepClone`.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+    ``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+    ``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support cloning
+
+*)
+
+METHOD ABSTRACT clone	:CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="compareElements" Id="{f94a5196-f8af-4785-a2e8-8d2bdfc06d35}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Compares two objects, if set uses the comparator, else uses the built in comparator of object1.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``Smaller``: ``Object1`` precendes ``Object2`` in order,
+	``Greater``: ``Object1`` succeds ``Object2`` in order,
+	``Equal``: ``Object1`` equals ``Object2`` in Order
+	
+*)
+
+METHOD PROTECTED compareElements	:CNM_ReturnTypes.ComparationResult
+VAR_INPUT
+	(*first object to compare*)
+	object1	:CNM_AbstractObject.IObject;
+	(*second object to compare*)
+	object2	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectValid(THIS^.elementComparator) THEN 
+	compareElements := THIS^.elementComparator.compare(object1,object2);   
+ELSIF (THIS^.isObjectValid(object1)) THEN
+	compareElements := object1.compareTo(object2);
+ELSIF (THIS^.isObjectValid(object2)) THEN
+	compareElements := CNM_ReturnTypes.ComparationResult.GREATER;
+ELSE
+	compareElements := CNM_ReturnTypes.ComparationResult.EQUAL;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="deepClone" Id="{f33bb425-575f-4211-9141-93936a6a4f59}" FolderPath="IObject\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are cloned too.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+If something goes wrong, then this method must clean up everything
+that has been cloned and free the memory again.
+**The deepClone either works completely, or not at all**
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+    ``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+    ``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support deep cloning
+
+*)
+
+METHOD deepClone	:CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[deepClone := THIS^.clone(clonedObject => clonedObject);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Exit" Id="{bdfbc3c1-981d-48be-a3ea-f242b34116d6}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it staiys in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectValid(THIS^.elementComparator) THEN
+	THIS^.elementComparator.deepDestruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="maxCycleCompares" Id="{320c841e-25e0-4879-b5f8-b126f5c2783f}" FolderPath="IListSorter\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property defines the maximum amount of compares that should be done per Cycle. Is optional as default should be set by class.
+Passing zero resets to class specific default.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY maxCycleCompares	:UDINT
+]]></Declaration>
+      <Get Name="Get" Id="{e5fd46c2-a09f-4fa4-9f1c-735b5d9df4b6}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[maxCycleCompares := THIS^.upperCompareBound;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{91846f02-0f9d-4414-9528-b0723a0f8811}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.upperCompareBound := SEL(
+	maxCycleCompares = 0,
+	maxCycleCompares,
+	GeneralParameters.DEFAULT_OPERATIONS_PER_CYCLE
+);
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="prepareClonedSorter" Id="{a56e055c-b8de-4425-9e7e-044f75f9699f}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Does the basic initialization for a new sorter that was cloned from THIS^
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED prepareClonedSorter
+VAR_INPUT
+	(*The cloned sorter to init*)
+	newSorter :CNM_CollectionInterfaces.IListSorter;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (THIS^.isObjectValid(newSorter)) THEN
+	newSorter.maxCycleCompares := THIS^.maxCycleCompares;	
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="setComparator" Id="{bee73ab0-d68d-42aa-8d24-9b6671e76f75}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method can replace the default comperator for custom one.
+Useful if you par example want to invert the order of the sort.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``THIS^`` `IListSorter`
+
+*)
+
+METHOD PROTECTED setComparator	:CNM_CollectionInterfaces.IListSorter
+VAR_INPUT
+	(*the instance of the comperator to be used for sorting*)
+	comparator	:CNM_AbstractObject.IComparator;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.elementComparator := comparator;
+setComparator := THIS^;
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="AbstractListSorter">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractListSorter.className.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractListSorter.clearContents">
+      <LineId Id="3" Count="0" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractListSorter.clone">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractListSorter.compareElements">
+      <LineId Id="1" Count="1" />
+      <LineId Id="7" Count="5" />
+      <LineId Id="5" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractListSorter.deepClone">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractListSorter.FB_Exit">
+      <LineId Id="1" Count="3" />
+    </LineIds>
+    <LineIds Name="AbstractListSorter.maxCycleCompares.Get">
+      <LineId Id="5" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractListSorter.maxCycleCompares.Set">
+      <LineId Id="8" Count="4" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractListSorter.prepareClonedSorter">
+      <LineId Id="1" Count="0" />
+      <LineId Id="7" Count="2" />
+    </LineIds>
+    <LineIds Name="AbstractListSorter.setComparator">
+      <LineId Id="1" Count="2" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="FastSwap" Id="{5f605d9c-37e9-474f-a47e-65f05a4da301}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+## Short summary
+
+Fast element swap operation of two given pointers, optimized for performance.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+FUNCTION FastSwap
+VAR_INPUT
+	object1 :POINTER TO __XWORD;
+	object2 :POINTER TO __XWORD;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[RETURN(object1 = object2);
+RETURN(object1 = 0 OR object2 = 0);
+object1^ := object2^ XOR object1^;
+object2^ := object2^ XOR object1^;
+object1^ := object2^ XOR object1^;
+]]></ST>
+    </Implementation>
+    <LineIds Name="FastSwap">
+      <LineId Id="1" Count="5" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

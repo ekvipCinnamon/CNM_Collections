@@ -1,0 +1,395 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="ForEachInstantStrategyExecutor" Id="{53ac9a74-7a24-4fda-aa36-7ebb1766ea75}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+An class to implement parallel and serial foreach strategies.
+
+**Warning:**
+Uses the iterate function of the attached collection and will thus conflict with other 
+foreach and iterate statements of the same collection instance.
+
+
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+FUNCTION_BLOCK INTERNAL FINAL ForEachInstantStrategyExecutor EXTENDS CNM_AbstractObject.Object IMPLEMENTS CNM_CollectionInterfaces.IInstantForEachStrategy
+VAR
+	usedCollection :CNM_CollectionInterfaces.ICollection;
+	{attribute 'no_copy'}
+	serialIterator :CNM_CollectionInterfaces.IIterator;
+	{attribute 'no_copy'}
+	parallelIterator :CNM_CollectionInterfaces.IIterator;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="private" Id="{0b9a5bac-a3d9-4518-8a2b-0896530c50ad}" />
+    <Method Name="attachCollection" Id="{336edfc1-43e9-480a-a074-f1dc82f93edc}">
+      <Declaration><![CDATA[METHOD INTERNAL attachCollection
+VAR_INPUT
+	collection : CNM_CollectionInterfaces.ICollection;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.usedCollection := collection;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{e87c9799-3bc9-4a09-9d97-833c72ef40e3}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY className :CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{64461e35-37ec-45f9-8a67-0dde2c658d4d}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.ForEachStrategyExecutor';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="FB_Exit" Id="{08b64f19-e1df-4a14-9b0c-c2a773cf8b40}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it staiys in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF(THIS^.isObjectValid(THIS^.serialIterator))THEN
+	THIS^.serialIterator.destruct();
+	THIS^.serialIterator := 0;
+END_IF
+IF(THIS^.isObjectValid(THIS^.parallelIterator))THEN
+	THIS^.parallelIterator.destruct();
+	THIS^.parallelIterator := 0;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Init" Id="{a9890d90-81ad-4a1c-85dc-95db4014340f}">
+      <Declaration><![CDATA[//FB_Init is always available implicitly and it is used primarily for initialization.
+//The return value is not evaluated. For a specific influence, you can also declare the
+//methods explicitly and provide additional code there with the standard initialization
+//code. You can evaluate the return value.
+METHOD FB_Init: BOOL
+VAR_INPUT
+    bInitRetains: BOOL; // TRUE: the retain variables are initialized (reset warm / reset cold)
+    bInCopyCode: BOOL;  // TRUE: the instance will be copied to the copy code afterward (online change)   
+	collection : CNM_CollectionInterfaces.ICollection;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[usedCollection := collection;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="parallel" Id="{66a508fd-3c41-41de-8f5b-6f125eadaa2f}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Method to perform a given action on all objects inside the collection.
+All objects are invoked with the applier until all are done.
+If at any point the applier returns an error the foreach stops and returns an error.
+Action to perform needs to implement `IApplier`.
+
+**Attention:** This method is single cycle, what means the call waits for all appliers to finish. 
+	Therefore none of the appliers should wait for anything (Events/IO/...) 
+
+**Example:**
+You have a list of numbers: 1 2 3 and a ConcreteIncrementApplier that can take  a number and increment it. 
+Calling ```list.forEach(ConcreteIncrementApplier)``` will increment all numbers in the list, becoming: 2 3 4.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: All appliers returned with ``SUCCESS``
+	``ERROR``: The applier returned error for at least one object, or any other error occured
+
+*)
+
+METHOD parallel :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*the applier (action) to be used on all obejcts in the collection*)
+	applier		:CNM_CollectionInterfaces.IApplier;
+END_VAR
+VAR
+	continueForeach :BOOL;
+	chained			:CNM_CollectionInterfaces.IChainedApplier;
+	allObjectsAppliedWithSuccess :BOOL;
+	firstApllierCall :BOOL;
+	objectState		:CNM_ReturnTypes.SingleExecutionState;
+	currentApplier 	:CNM_CollectionInterfaces.IApplier;
+	object :CNM_AbstractObject.IObject;
+	applierIndex 	:UDINT;
+END_VAR
+VAR CONSTANT
+	NULL : __XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[applierIndex := 0;
+currentApplier := 0;
+continueForeach := TRUE;
+IF ((
+		THIS^.isObjectNull(THIS^.parallelIterator)
+	) AND_THEN (
+		THIS^.usedCollection.createNewIterator(iterator => THIS^.parallelIterator)
+		<> CNM_ReturnTypes.SingleExecutionResult.SUCCESS
+	)
+) THEN
+	parallel := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	RETURN;
+END_IF
+
+WHILE THIS^.selectApplier(applier, applierIndex, currentApplier) DO
+	firstApllierCall := TRUE;
+	allObjectsAppliedWithSuccess := FALSE;
+	THIS^.parallelIterator.iterate(FALSE);	
+	WHILE (NOT allObjectsAppliedWithSuccess) DO
+		allObjectsAppliedWithSuccess := TRUE;
+		THIS^.parallelIterator.iterate(FALSE);
+		//	call applier for all objects until all are success  
+		WHILE (
+			 THIS^.parallelIterator.iterate(execute := TRUE, object => object) 
+				= CNM_ReturnTypes.SingleExecutionState.BUSY
+		) DO 
+			IF(currentApplier.accept(object) = CNM_ReturnTypes.SingleExecutionResult.SUCCESS)THEN
+				IF firstApllierCall THEN currentApplier.apply(FALSE); END_IF;
+				objectState := 	currentApplier.apply(TRUE);
+				CASE objectState OF
+				CNM_ReturnTypes.SingleExecutionState.SUCCESS:
+					CONTINUE;
+				CNM_ReturnTypes.SingleExecutionState.BUSY:
+					allObjectsAppliedWithSuccess := FALSE;
+					CONTINUE;
+				ELSE
+					parallel := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+					RETURN;	
+				END_CASE
+			END_IF
+			parallel := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+			RETURN;
+		END_WHILE
+		firstApllierCall := FALSE;
+	END_WHILE
+END_WHILE	
+parallel := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="selectApplier" Id="{335a62d8-8e5f-42be-8237-41dbf83b5a13}" FolderPath="private\">
+      <Declaration><![CDATA[METHOD PRIVATE selectApplier :BOOL
+VAR_INPUT
+	applier : CNM_CollectionInterfaces.IApplier;
+END_VAR
+VAR_IN_OUT
+	applierIndex : UDINT;
+	nextApplier :CNM_CollectionInterfaces.IApplier;
+END_VAR
+VAR
+	chained	:CNM_CollectionInterfaces.IChainedApplier;
+END_VAR
+VAR CONSTANT
+	NULL : __XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[selectApplier := FALSE;
+IF (__QUERYINTERFACE(applier, chained) AND_THEN (chained.actions.count > applierIndex)) THEN
+	nextApplier := chained.actions.getApplier(index := applierIndex);
+	selectApplier := TRUE;
+	applierIndex := (applierIndex + 1);
+ELSIF (THIS^.isObjectNull(nextApplier)) THEN
+	nextApplier := applier;	
+	selectApplier := TRUE;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="serial" Id="{e1fdc94b-717c-40fd-ba07-1b072baaccaf}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Method to perform a given action on all objects inside the collection.
+Objects are invoked with the applier in order until done, only then is the next invoked.
+Order is defined by the default iterator.
+If at any point the applier returns an error the foreach stops and returns an error.
+Action to perform needs to implement `IApplier`.
+
+**Attention:** This method is single cycle, what means the call waits for all appliers to finish. 
+	Therefore none of the appliers should wait for anything (Events/IO/...) 
+
+**Example:**
+You have a list of numbers: 1 2 3 and a ConcreteIncrementApplier that can take  a number and increment it. 
+Calling ```list.forEach(ConcreteIncrementApplier)``` will increment all numbers in the list, becoming: 2 3 4.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: Alle appliers returned with ``SUCCESS``
+	``ERROR``: The applier returned error for at least one object, or any other error occured
+
+*)
+
+METHOD serial :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*the applier to be used on all objects*)
+	applier		:CNM_CollectionInterfaces.IApplier;
+END_VAR
+VAR
+	continueForeach :BOOL;
+	objectState :CNM_ReturnTypes.SingleExecutionState;
+	object		: CNM_AbstractObject.IObject;
+	applierIndex 	:UDINT;
+	currentApplier 	:CNM_CollectionInterfaces.IApplier;
+END_VAR
+VAR CONSTANT
+	NULL : __XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[applierIndex := 0;
+currentApplier := 0;
+IF ((
+		THIS^.isObjectNull(THIS^.serialIterator)
+	) AND_THEN (
+		THIS^.usedCollection.createNewIterator(iterator => THIS^.serialIterator)
+		<> CNM_ReturnTypes.SingleExecutionResult.SUCCESS
+	)
+) THEN
+	serial := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	RETURN;
+END_IF
+
+WHILE THIS^.selectApplier(applier, applierIndex, currentApplier) DO
+	THIS^.serialIterator.iterate(execute := FALSE);
+	WHILE (THIS^.serialIterator.iterate(execute := TRUE, object => object) = CNM_ReturnTypes.SingleExecutionState.BUSY) DO
+		IF currentApplier.accept(object) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS THEN
+			serial := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+			RETURN;
+		END_IF
+		currentApplier.apply(FALSE);
+		WHILE TRUE DO
+			objectState := currentApplier.apply(TRUE);
+			CASE objectState OF
+			CNM_ReturnTypes.SingleExecutionState.SUCCESS:
+				EXIT;
+			CNM_ReturnTypes.SingleExecutionState.BUSY:
+				;
+			ELSE
+				serial := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+				RETURN;
+			END_CASE
+		END_WHILE
+	END_WHILE
+END_WHILE
+
+serial := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="ForEachInstantStrategyExecutor">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="ForEachInstantStrategyExecutor.attachCollection">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ForEachInstantStrategyExecutor.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ForEachInstantStrategyExecutor.FB_Exit">
+      <LineId Id="1" Count="8" />
+    </LineIds>
+    <LineIds Name="ForEachInstantStrategyExecutor.FB_Init">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ForEachInstantStrategyExecutor.parallel">
+      <LineId Id="1" Count="47" />
+    </LineIds>
+    <LineIds Name="ForEachInstantStrategyExecutor.selectApplier">
+      <LineId Id="1" Count="9" />
+    </LineIds>
+    <LineIds Name="ForEachInstantStrategyExecutor.serial">
+      <LineId Id="1" Count="37" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

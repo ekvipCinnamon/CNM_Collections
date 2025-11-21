@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="TestLinkedList" Id="{5d929449-0017-4424-8b61-42864ff2339c}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK TestLinkedList EXTENDS CNM_Collections.LinkedList
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="getLastElement" Id="{6b2b38ba-b14b-497f-9e15-b841df61eff8}">
+      <Declaration><![CDATA[PROPERTY getLastElement : CNM_CollectionInterfaces.IDoublyLinkedElement]]></Declaration>
+      <Get Name="Get" Id="{4248c1af-4c29-4e19-8ba1-1f25c2304852}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[getLastElement := THIS^.lastElement;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="TestLinkedList">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="TestLinkedList.getLastElement.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

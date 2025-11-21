@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="TestArrayList" Id="{7af15b8b-a788-49aa-92db-86a8ddd67e2a}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK TestArrayList EXTENDS CNM_Collections.ArrayList
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="currentContainerSize" Id="{486fc939-a0bd-479f-b690-55f698662aef}">
+      <Declaration><![CDATA[PROPERTY currentContainerSize : __XWORD]]></Declaration>
+      <Get Name="Get" Id="{ea8a11c9-6951-4746-ae05-2ac36edec439}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[currentContainerSize := THIS^.currentContainerCapacity;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="TestArrayList">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="TestArrayList.currentContainerSize.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

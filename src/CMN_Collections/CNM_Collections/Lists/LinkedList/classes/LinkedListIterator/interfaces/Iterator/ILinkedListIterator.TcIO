@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <Itf Name="ILinkedListIterator" Id="{e220d0cc-9d4b-45f2-accd-3df7dddd9000}">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This interface extends the IIterator interface for collections by the method attachLinkedList().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+INTERFACE ILinkedListIterator EXTENDS CNM_CollectionInterfaces.IIterator
+]]></Declaration>
+    <Method Name="attachLinkedList" Id="{6cd962cd-5b42-4f58-8b10-7d446d8859a0}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method attaches an array list to the iterator.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: the list could be attached to the iterator
+
+*)
+
+METHOD attachLinkedList : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(* The list to be attached. Should be of type ``CNM_CollectionInterfaces.ILinkedList`` *)
+	list :REFERENCE TO LinkedList;
+END_VAR
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

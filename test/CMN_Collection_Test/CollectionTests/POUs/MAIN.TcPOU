@@ -1,0 +1,103 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.11">
+  <POU Name="MAIN" Id="{18f48742-a158-4c20-ab39-e5100f477e21}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR
+	optionVerbose 						:BOOL := FALSE;
+    testCollectionFactory 				:CNM_Collections.CollectionFactory();
+	
+	
+	(*Linked List Tests*)
+	linkedList 							:CNM_Collections.LinkedList();
+	linkedList2 						:CNM_Collections.LinkedList();
+	linkedList3							:CNM_Collections.LinkedList();
+	LinkedListTest 						:CNM_CollectionTestLib.ListInterfaceTest(linkedList, linkedList2, testCollectionFactory);
+	linkedListDispatcher				:CNM_CollectionTestLib.ListDispatcher(linkedList3);
+	linkedListCollectionTest			:CNM_CollectionTestLib.CollectionInterfaceTest(linkedList3, testCollectionFactory, linkedListDispatcher);
+	LinkedListObjectTest  				:AbstractObject_Test(linkedList, linkedList2);
+	LinkedListTest2						:LinkedListTest(linkedList, linkedList2, testCollectionFactory);
+	linkedListForIteratorTest			:CNM_Collections.LinkedList();
+	forwardLinkedListIterator			:CNM_Collections.ForwardLinkedListIterator(list:=linkedListForIteratorTest);
+	inverseLinkedListIterator			:CNM_Collections.InverseLinkedListIterator(list:=linkedListForIteratorTest);
+	linkedListDispatcherIteratorTest	:CNM_CollectionTestLib.ListDispatcher(linkedListForIteratorTest);
+	linkedListForwardIteratorTest		:CNM_CollectionTestLib.IteratorInterfaceTest(linkedListForIteratorTest,forwardLinkedListIterator,linkedListDispatcherIteratorTest);
+	linkedListInverseIteratorTest		:CNM_CollectionTestLib.IteratorInterfaceTest(linkedListForIteratorTest,inverseLinkedListIterator,linkedListDispatcherIteratorTest);
+	
+	(*Linkedlistsorter Tests*)
+	(*Mergesorter*)
+	LinkedListMergeSorter1				:CNM_Collections.LinkedListMergeSorter();
+	LinkedListMergeSorter2				:CNM_Collections.LinkedListMergeSorter();
+	LinkedListMergeSorterTest			:CNM_CollectionTestLib.ListSorterTest(ListFactory := testCollectionFactory, externListSorter := LinkedListMergeSorter1, verboseLogging := optionVerbose);
+	LinkedListMergeSorterObjectTest 	:AbstractObject_Test(LinkedListMergeSorter1, LinkedListMergeSorter2);
+	
+	(*Array List Tests*)
+	arrayList1 							:CNM_Collections.ArrayList();
+	arrayList2 							:CNM_Collections.ArrayList();
+	arrayList3 							:CNM_Collections.ArrayList();	
+	arrayList4							:CNM_Collections.ArrayList();
+	ArrayListTest 						:CNM_CollectionTestLib.ListInterfaceTest(arrayList1, arrayList2, testCollectionFactory);
+	arrayListDispatcher					:CNM_CollectionTestLib.ListDispatcher(arrayList3);		
+	arrayListCollectionTest				:CNM_CollectionTestLib.CollectionInterfaceTest(arrayList3, testCollectionFactory, arrayListDispatcher);
+	arrayListIndexableTest 				:CNM_CollectionTestLib.IndexableCollectionTest(arrayList4);
+	arrayListObjectTest  				:AbstractObject_Test(arrayList1, arrayList2);
+	arrayListForIteratorTest			:CNM_Collections.ArrayList();
+	forwardArrayListIterator			:CNM_Collections.ForwardArrayListIterator(arrayList:=arrayListForIteratorTest);
+	inverseArrayListIterator			:CNM_Collections.InverseArrayListIterator(arrayList:=arrayListForIteratorTest);
+	arrayListDispatcherIteratorTest		:CNM_CollectionTestLib.ListDispatcher(arrayListForIteratorTest);
+	arrayListForwardIteratorTest		:CNM_CollectionTestLib.IteratorInterfaceTest(arrayListForIteratorTest,forwardArrayListIterator,arrayListDispatcherIteratorTest);
+	arrayListInverseIteratorTest		:CNM_CollectionTestLib.IteratorInterfaceTest(arrayListForIteratorTest,inverseArrayListIterator,arrayListDispatcherIteratorTest);
+	
+	(*Arraylistsorter Tests*)
+	(*Mergesorter*)
+	ArrayListMergeSorter1 				:CNM_Collections.ArrayListMergeSorter();
+	ArrayListMergeSorter2 				:CNM_Collections.ArrayListMergeSorter();
+	ArrayListMergeSorterTest 			:ContainerBasedArrayListSorterTest(ListFactory := testCollectionFactory, externListSorter := ArrayListMergeSorter1, verboseLogging := optionVerbose);
+	ArrayListMergeSorterObjectTest 		:AbstractObject_Test(ArrayListMergeSorter1, ArrayListMergeSorter2);
+	
+	(*Timsorter*)
+	ArrayListTwinSorter 				:CNM_Collections.ArrayListTwinSorter();
+	ArrayListTwinSorter2 				:CNM_Collections.ArrayListTwinSorter(); 
+	ArrayListTwinSorterTest 				:ContainerBasedArrayListSorterTest(ListFactory:=testCollectionFactory,externListSorter := ArrayListTwinSorter, verboseLogging := optionVerbose);
+	ArrayListTwinSorterObjectTest 		:AbstractObjectTestLib.AbstractObject_Test(ArrayListTwinSorter, ArrayListTwinSorter2);
+	
+	(*Shellsorter*)
+	ArrayListShellSorter 				:CNM_Collections.ArrayListShellSorter;
+	ArrayListShellSorter2 				:CNM_Collections.ArrayListShellSorter;
+	ArrayListShellSorterTest 			:ContainerBasedArrayListSorterTest(ListFactory:=testCollectionFactory,externListSorter := ArrayListShellSorter, verboseLogging := optionVerbose);
+	ArrayListShellSorterObjectTest 		:AbstractObjectTestLib.AbstractObject_Test(ArrayListShellSorter, ArrayListShellSorter2);
+
+	(*Treetests*)
+	TreeFactory							:CNM_Collections.CollectionFactory();
+	InterfaceTreeTest					:CNM_CollectionTestLib.BalancedBinaryTreeTest(Treefactory := Treefactory);
+	ClassTreeTest						:concretBBSTreeTest(Treefactory := TreeFactory);
+	tree1								:CNM_Collections.BalancedBinarySearchTree(0);
+	tree2								:CNM_Collections.BalancedBinarySearchTree(0);
+	tree3								:CNM_Collections.BalancedBinarySearchTree(0);
+	treeDispatcher						:CNM_CollectionTestLib.TreeDispatcher(tree3);
+	treeCollectionTest					:CNM_CollectionTestLib.CollectionInterfaceTest(tree3, treeFactory, treeDispatcher);
+	objectTreeTest						:AbstractObject_Test(tree1, tree2);
+	treeForIteratorTest					:CNM_Collections.BalancedBinarySearchTree(0);
+	bfsTreeIterator						:CNM_Collections.BfsBbstIterator(tree:=treeForIteratorTest);
+	dfsTreeIterator						:CNM_Collections.DfsBbstIterator(tree:=treeForIteratorTest);
+	inorderTreeIterator					:CNM_Collections.InorderBbstIterator(tree:=treeForIteratorTest);
+	treeDispatcherIteratorTest			:CNM_CollectionTestLib.TreeDispatcher(treeForIteratorTest);
+	treeBFSIteratorTest					:CNM_CollectionTestLib.IteratorInterfaceTest(treeForIteratorTest,bfsTreeIterator,treeDispatcherIteratorTest);
+	treeDFSIteratorTest					:CNM_CollectionTestLib.IteratorInterfaceTest(treeForIteratorTest,dfsTreeIterator,treeDispatcherIteratorTest);
+	treeInorderIteratorTest				:CNM_CollectionTestLib.IteratorInterfaceTest(treeForIteratorTest,inorderTreeIterator,treeDispatcherIteratorTest);
+END_VAR
+VAR CONSTANT
+	NOT_DEFINED 						:__XWORD := 0;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[ TcUnit.RUN_IN_SEQUENCE();
+
+]]></ST>
+    </Implementation>
+    <LineIds Name="MAIN">
+      <LineId Id="2" Count="0" />
+      <LineId Id="67" Count="0" />
+      <LineId Id="8" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

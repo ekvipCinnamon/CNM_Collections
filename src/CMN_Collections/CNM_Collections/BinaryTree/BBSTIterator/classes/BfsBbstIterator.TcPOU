@@ -1,0 +1,133 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="BfsBbstIterator" Id="{6aac5e11-1f74-4d52-8b74-0c42fe7b1a2f}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This class implements the breadth first iteration strategy for balanced binary search trees.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK BfsBbstIterator EXTENDS AbstractBalancedBinarySearchTreeIterator
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="className" Id="{d9c15d61-eb3c-459c-ab1c-acd72842ebef}">
+      <Declaration><![CDATA[PROPERTY className :CNM_AbstractObject.ClassName]]></Declaration>
+      <Get Name="Get" Id="{2235bd85-b217-4725-9bea-f6f4cc955c57}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.BFS_BBSTIterator';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="getNextTreeNode" Id="{ebc897b8-539e-41ea-b527-bcfeee98df58}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Gets the next Node that iterate should process.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``TRUE`` a valid node existed, ``FALSE`` no node for iteration existed
+
+*)
+
+METHOD PROTECTED getNextTreeNode : BOOL
+VAR_OUTPUT
+	node	:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR
+	tmpObject :CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[tmpObject := THIS^.nodeList.dequeue();
+__QUERYINTERFACE(tmpObject, node);
+getNextTreeNode := THIS^.isObjectValid(node);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="processNode" Id="{26889ffc-74ff-46d2-a1ca-3deb2b839426}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method appends (if they exists) the left and right child of the node to the nodelist.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED processNode
+VAR_INPUT
+	nodeToProcess	: CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF(nodeToProcess.leftChild <> 0)THEN
+	THIS^.nodeList.append(nodeToProcess.leftChild);
+END_IF
+IF(nodeToProcess.rightChild <> 0)THEN
+	THIS^.nodeList.append(nodeToProcess.rightChild);
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="BfsBbstIterator">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="BfsBbstIterator.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BfsBbstIterator.getNextTreeNode">
+      <LineId Id="1" Count="3" />
+    </LineIds>
+    <LineIds Name="BfsBbstIterator.processNode">
+      <LineId Id="1" Count="6" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

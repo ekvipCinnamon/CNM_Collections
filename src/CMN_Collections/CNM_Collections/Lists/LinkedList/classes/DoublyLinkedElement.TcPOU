@@ -1,0 +1,394 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="DoublyLinkedElement" Id="{ad4715d0-a462-4b56-b0ef-ce88b74be310}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Implementation of IDoublyLinkElement.
+Does not allow NULL as object.
+
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+{attribute 'hide'}
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK INTERNAL DoublyLinkedElement EXTENDS AbstractDisposableContainer IMPLEMENTS CNM_CollectionInterfaces.IDoublyLinkedElement
+VAR
+	nextElement 	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	previousElement :CNM_CollectionInterfaces.IDoublyLinkedElement;
+	dataObject 		:CNM_AbstractObject.IObject;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="className" Id="{e7599571-6fb7-4820-813d-e9961215ef2b}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{f244dafb-60ca-457b-b745-ead82008a35f}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.DoublyLinkedElement';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clearContents" Id="{003b5bf6-f373-41d4-b7d6-4869f3811646}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD PROTECTED clearContents
+VAR CONSTANT
+	(* NULL is a constant which is always 0 *)
+	NULL				:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.dataObject := NULL;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="destructContents" Id="{f39d574d-c720-44e6-af92-e4c28b8e054b}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the deepDestruct method and is intended to destruct all contained Objects of the collection. 
+To delete only the collection without deleting all its contents, use destruct() instead of deepDestruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD PROTECTED destructContents
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (THIS^.isObjectValid(THIS^.dataObject)) THEN
+	THIS^.dataObject.deepDestruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Exit" Id="{bf6390f7-a5dc-4000-af46-29ea820c0286}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it staiys in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (THIS^.isObjectValid(THIS^.dataObject)) THEN
+	THIS^.dataObject.deepDestruct();
+END_IF
+
+
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{dd4a4290-06fc-4df8-882b-3ace240de3a8}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The constructor ``FB_init`` is needed to create an unique hash code.
+The hash code is a pseudo random number create with a [xorshift](https://en.wikipedia.org/wiki/Xorshift) algorithm.
+It can be overwritten on derivations, because it will be called implicit, ``SUPER^.FB_init()`` is not required.
+For more information check: [Behavoir with derived function blocks](https://infosys.beckhoff.com/content/1033/tc3_plc_intro/5482088715.html?id=6983869892358031022).
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD FB_init : BOOL
+VAR_INPUT
+	(* if TRUE, the retain variables are initialized (warm start / cold start)*)
+	bInitRetains	:BOOL;
+	(* if TRUE, the instance afterwards gets moved into the copy code (online change) *)
+	bInCopyCode		:BOOL;  
+	content 			:CNM_AbstractObject.IObject;
+	next 	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	previous :CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+VAR
+	{attribute 'hide'}
+	newHashstate3		:CNM_AbstractObject.Hashcode;
+END_VAR
+VAR CONSTANT
+	{attribute 'hide'}
+	NUMBER_OF_LEFT_SHIFTS		:UINT	:= 17;
+	{attribute 'hide'}
+	NUMBER_OF_LEFT_ROTATIONS	:UINT   := 45;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.object := content;
+THIS^.next := next;
+THIS^.previous := previous;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="next" Id="{cf3f0d7f-67dc-4264-9401-90663ed6c82e}">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This property returns the next element that is linked to this element. Next element previous should be this object.
+Next is not effected by deepdestruct.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY next : CNM_CollectionInterfaces.IDoublyLinkedElement
+]]></Declaration>
+      <Get Name="Get" Id="{c7dfb849-89b9-442f-b85f-f786d527d993}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[next := THIS^.nextElement;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{8aea076d-bc2a-486b-9e3b-f670f1896edb}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.nextElement := next;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="object" Id="{5f856f2d-9697-4d9a-9a18-c225cdff3d69}">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This property returns `CNM_AbstractObject.IObject` that represents the data of this element.
+The passed object will be destroyed in deepDestruct.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY object : CNM_CollectionInterfaces.CNM_AbstractObject.IObject
+]]></Declaration>
+      <Get Name="Get" Id="{3286d1ba-f578-4e25-a452-cbde742bef77}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[object := THIS^.dataObject;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{83d3363f-37e9-4e3c-b050-97eeadce60ee}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.dataObject := object;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="previous" Id="{e228dd43-3eb2-4440-ad5b-9cbf778c770d}">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This property returns the previous element that is linked to this element. Previous element next should be this object.
+Previous is not 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY previous : CNM_CollectionInterfaces.IDoublyLinkedElement
+]]></Declaration>
+      <Get Name="Get" Id="{d6895bf2-a92b-48d8-84b1-ab65f5566c73}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[previous := THIS^.previousElement;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{cde24539-ddfb-4d8f-ab1a-5f762b424924}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.previousElement := previous;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <LineIds Name="DoublyLinkedElement">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="DoublyLinkedElement.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="DoublyLinkedElement.clearContents">
+      <LineId Id="3" Count="0" />
+      <LineId Id="10" Count="0" />
+    </LineIds>
+    <LineIds Name="DoublyLinkedElement.destructContents">
+      <LineId Id="1" Count="3" />
+    </LineIds>
+    <LineIds Name="DoublyLinkedElement.FB_Exit">
+      <LineId Id="1" Count="2" />
+      <LineId Id="5" Count="2" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="DoublyLinkedElement.FB_init">
+      <LineId Id="47" Count="0" />
+      <LineId Id="50" Count="0" />
+      <LineId Id="53" Count="1" />
+    </LineIds>
+    <LineIds Name="DoublyLinkedElement.next.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="DoublyLinkedElement.next.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="DoublyLinkedElement.object.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="DoublyLinkedElement.object.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="DoublyLinkedElement.previous.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="DoublyLinkedElement.previous.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

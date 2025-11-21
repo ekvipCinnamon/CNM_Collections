@@ -1,0 +1,547 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="AbstractBalancedBinarySearchTreeIterator" Id="{e83d5328-67e1-4297-a1bd-5776ddddae8c}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This class provides the basic methods and functionalities for Balanced Binary Tree iterators.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+FUNCTION_BLOCK ABSTRACT AbstractBalancedBinarySearchTreeIterator EXTENDS AbstractIterator IMPLEMENTS IBBSTIterator
+VAR	
+	{attribute 'hide'}
+	tree 		:REFERENCE TO BalancedBinarySearchTree;
+	nodeList 	:LinkedList();
+	currentNode :CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="Protected" Id="{42a0b6c6-f8c4-41e9-995c-adbacae3ed04}" />
+    <Method Name="attachTree" Id="{d5a84920-231b-46e9-bc70-9ad195df4bbc}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method attaches an binary balances search tree to the iterator.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: the tree could be attached to the iterator
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: the passed tree was not valid
+
+*)
+
+METHOD attachTree
+VAR_INPUT
+	tree : REFERENCE TO BalancedBinarySearchTree;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.tree REF= tree;
+THIS^.reset();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="changes" Id="{5f55332c-3c5e-4b53-8439-0d5e860f9388}" FolderPath="Protected\">
+      <Declaration><![CDATA[PROPERTY PROTECTED changes : __XWORD
+]]></Declaration>
+      <Get Name="Get" Id="{5d9d4ec0-f6af-4f7b-bb89-5ef041618aaa}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[changes := THIS^.tree.changesToCollection;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="FB_Exit" Id="{d492c884-775b-49d5-b409-ca55a251e737}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it staiys in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectValid(THIS^.nodeList) THEN
+	THIS^.nodeList.clear();
+END_IF
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{89af592e-d8d3-4b45-8d00-96d4e03c1d15}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The constructor ``FB_init`` is needed to create an unique hash code.
+The hash code is a pseudo random number create with a [xorshift](https://en.wikipedia.org/wiki/Xorshift) algorithm.
+It can be overwritten on derivations, because it will be called implicit, ``SUPER^.FB_init()`` is not required.
+For more information check: [Behavoir with derived function blocks](https://infosys.beckhoff.com/content/1033/tc3_plc_intro/5482088715.html?id=6983869892358031022).
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD FB_init : BOOL
+VAR_INPUT
+	(* if TRUE, the retain variables are initialized (warm start / cold start)*)
+	bInitRetains	: BOOL;
+	(* if TRUE, the instance afterwards gets moved into the copy code (online change) *)
+	bInCopyCode	: BOOL;
+	(*The tree that should be iterated, can be 0*)
+	tree	:REFERENCE TO BalancedBinarySearchTree;	
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.tree REF= tree;
+IF THIS^.isObjectValid(tree) THEN
+	THIS^.nodeList.append(THIS^.root);
+	THIS^.currentNode := THIS^.root;	
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getNextTreeNode" Id="{b9a7ea09-b344-4f8a-8958-837b87b11782}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Gets the next Node that iterate should process.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``TRUE`` a valid node existed, ``FALSE`` no node for iteration existed
+
+*)
+
+METHOD PROTECTED ABSTRACT getNextTreeNode :BOOL
+VAR_OUTPUT
+	node :CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getStartNode" Id="{5f8df344-6160-4670-a575-b7b486df37e7}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called to retrive the first node of the iteration.
+Might have sideeffects, like changes to THIS^.nodelist.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED getStartNode : CNM_CollectionInterfaces.IBinaryTreeNode
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[getStartNode := THIS^.root;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="hasNext" Id="{5fa1a05a-0dbf-4907-91e9-5b4d3d568a30}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns if there exists another element to iterate to.
+
+**Example:**
+```
+WHILE(iterator.hasNext())DO
+	iterator.getNext().foo();
+END_WHILE
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``TRUE``: Iterator has a next object that can be fetched with getNext()
+	``FALSE``: Iterator finished
+
+*)
+METHOD hasNext : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[hasNext := THIS^.nodeList.hasElement;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="iterate" Id="{452e8436-4980-4174-943d-58c1d1009075}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns the next object in the iteration and returns an execution state.
+**Example:**
+You have a list: 1 2 3
+the first iterate call will return CNM_ReturnTypes.BUSY and object = 1
+the second iterate call will return CNM_ReturnTypes.BUSY and object = 2
+the third iterate call will return CNM_ReturnTypes.BUSY and object = 3
+the forth iterate call will return CNM_ReturnTypes.SUCCESS and object = NULL
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionState.SUCCESS``: Iteration finished, no new elements, returned NULL object
+    ``SingleExecutionState.ERROR``: error during iteration
+    ``SingleExecutionState.ABORT``: iteration aborted
+    ``SingleExecutionState.BUSY``: returned an element and iteration in progress	
+    ``SingleExecutionState.IDLE``: ready for iteration
+
+*)
+METHOD iterate : CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	execute	: BOOL;
+END_VAR
+VAR_OUTPUT
+	object :CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	tmp : POINTER TO CNM_AbstractObject.Object;
+END_VAR
+VAR_INST
+	cycleManager :CNM_CycleManager.SimpleCycleManager;
+	lastExecute :BOOL;
+	lastChangeVersion :__XWORD;
+END_VAR
+VAR CONSTANT
+	INIT :DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	ITERATING :DINT := INIT + 1;
+	ERROR :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+	SUCCESS :DINT := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS;
+	NULL: __XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[iterate := CNM_ReturnTypes.SingleExecutionState.ERROR;
+RETURN (NOT THIS^.isObjectValid(THIS^.tree));
+cycleManager(execute := execute);
+CASE cycleManager.step.current OF
+INIT:
+	cycleManager.configuration.sequence.requireSuccessStep := FALSE;
+	lastChangeVersion := THIS^.changes;
+	THIS^.nodeList.clear();
+	THIS^.currentNode := THIS^.getStartNode();
+	IF THIS^.isObjectValid(THIS^.currentNode) THEN
+		THIS^.processStartNode(THIS^.currentNode);
+		THIS^.currentObject := THIS^.currentNode.object;
+	ELSE
+		THIS^.currentObject := 0;
+	END_IF 
+	
+	cycleManager.proceedWith(
+		step := SEL(
+			THIS^.hasNext(),
+			SUCCESS,
+			ITERATING
+		)
+	);
+ITERATING:
+	IF lastChangeVersion <> THIS^.changes THEN
+		iterate := CNM_ReturnTypes.SingleExecutionState.ERROR;
+		cycleManager.proceedWith(ERROR);
+		RETURN;
+	END_IF
+	IF(THIS^.hasNext()) AND_THEN  THIS^.getNextTreeNode(node => THIS^.currentNode) THEN
+		THIS^.currentObject := THIS^.currentNode.object;
+		THIS^.processNode(THIS^.currentNode);
+	ELSE
+		cycleManager.proceedWith(SUCCESS);
+		THIS^.currentObject := NULL;
+	END_IF
+END_CASE
+
+iterate := cycleManager.state;
+object := THIS^.currentObject;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="processNode" Id="{f1323236-669d-43b0-a876-93cb90028259}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called when the node is taken from the nodelist.
+Can perform actions as putting childnodes on the list etc.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED ABSTRACT processNode
+VAR_INPUT
+	nodeToProcess :CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="processStartNode" Id="{c83ab2c5-4243-4e58-9583-a014e13dcc34}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the initphase on the rootnode of the tree.
+Default implementation executes processNode.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED processStartNode
+VAR_INPUT
+	nodeToProcess :CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.processNode(nodeToProcess);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="reset" Id="{1d46b962-6690-46c5-8423-6c44861648ee}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method resets the iterator. 
+After a reset the iterator points to the first element if available.
+
+
+**Example:**
+```
+iterator.reset();
+WHILE(iterator.moveNext())DO
+	foo := iterator.current.hashCode;
+	bar := iterator.current.name;
+END_WHILE
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD reset
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.iterate(FALSE);
+THIS^.nodeList.clear();
+THIS^.nodeList.append(THIS^.root);
+THIS^.currentNode := THIS^.root;
+THIS^.currentObject := 0;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="root" Id="{640ef885-8964-4768-a0ca-d7c4d7b75e74}">
+      <Declaration><![CDATA[PROPERTY PROTECTED root : CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+]]></Declaration>
+      <Get Name="Get" Id="{56b6e8ca-a77e-4060-97cc-5b67f6b76db8}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF THIS^.isObjectValid(THIS^.tree) THEN
+	root := THIS^.tree.rootNode;
+ELSE
+	root := 0;
+END_IF
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.attachTree">
+      <LineId Id="14" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="15" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.changes.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.FB_Exit">
+      <LineId Id="1" Count="4" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.FB_init">
+      <LineId Id="1" Count="5" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.getNextTreeNode">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.getStartNode">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.hasNext">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.iterate">
+      <LineId Id="1" Count="23" />
+      <LineId Id="38" Count="1" />
+      <LineId Id="41" Count="1" />
+      <LineId Id="40" Count="0" />
+      <LineId Id="25" Count="0" />
+      <LineId Id="28" Count="1" />
+      <LineId Id="32" Count="2" />
+      <LineId Id="44" Count="0" />
+      <LineId Id="35" Count="2" />
+      <LineId Id="43" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.processNode">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.processStartNode">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.reset">
+      <LineId Id="1" Count="3" />
+      <LineId Id="6" Count="0" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractBalancedBinarySearchTreeIterator.root.Get">
+      <LineId Id="3" Count="0" />
+      <LineId Id="1" Count="0" />
+      <LineId Id="4" Count="2" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

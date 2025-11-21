@@ -1,0 +1,517 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="ArrayListMergeSorter" Id="{11b80b98-c50a-47cd-ae07-609b231b3667}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This FB sorts the list using a mergesort, which has O(n*log(n)) runtime. 
+For random data it is a bit faster than Timsort, else Timsort should be used. Needs to allocate extra memory while sorting, same size as currentContainerSize.
+
+**Caution:**
+	Due to the characteristics of a merge, a merge must be performed atomically.
+	As a merge of two lists l1 and l2 can take up to l1.size compares.
+	That implies that at the last cycle of the merge, an atomic operation that requires up to list.size/2 compares must be performed.
+	Therefore the maxCycleCompares may be exceeded and set the maxCycleCompares to a value smaller than list.size/2 may not have the desired effect.
+	
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK FINAL ArrayListMergeSorter EXTENDS AbstractMergeBasedSorter
+VAR
+	sortBuffer :POINTER TO CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="className" Id="{4af80853-b0df-43f7-a075-244b15abcf77}">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className	:CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{d804c83b-2f6d-42f1-925e-b12c1ce09e6e}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.ArrayListMergeSorter';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clone" Id="{9b20a2de-ebab-479d-b8d4-3e89448d733e}">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are not cloned for this there is the method ``ICloneable.deepClone``.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**	``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+	``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+	``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support cloning
+
+*)
+METHOD clone	:CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject	:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	newSorter :POINTER TO ArrayListMergeSorter;
+	sorter :CNM_CollectionInterfaces.IArrayListSorter;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[newSorter := __NEW(
+	ArrayListMergeSorter()
+);
+
+IF (newSorter = 0) THEN
+	clone := CNM_ReturnTypes.CloneResult.FAILED;
+ELSE
+	clone := CNM_ReturnTypes.CloneResult.SUCCESS;
+	THIS^.prepareClonedSorter(newSorter^);
+	clonedObject := newSorter^;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Exit" Id="{bd69d909-db4f-4050-9ddc-9cf29906bee3}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it staiys in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.sortBuffer <> 0  THEN
+	__DELETE(THIS^.sortBuffer);	
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantSort" Id="{8e46eb54-ac52-4ad5-a8c1-6a878e4c950b}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure instantly within one call. 
+It uses the passed Comparator to sort the structure or the compareTo of the contained Objects if no comparator is passed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``ERROR``: Sort was not able to finish 
+	``SUCCESS``: Sorting was finished succesfully
+
+*)
+METHOD instantSort : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The size of the list to be sorted*)
+	size	: UDINT;
+	(*the container, that contains the list elements*)
+	container	: POINTER TO CNM_CollectionInterfaces.CNM_AbstractObject.IObject;
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion	: __XWORD;
+END_VAR
+VAR 
+	instantSortBuffer :POINTER TO CNM_AbstractObject.IObject;
+	currentSortSize 	:UDINT := 1;
+	leftBound 			:UDINT;
+	middle 				:UDINT;
+	rightBound 			:UDINT;
+	maximumLeftBound	:UDINT;
+	stepSize 			:UDINT;
+END_VAR
+VAR CONSTANT
+	NULL :__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[instantSortBuffer := __NEW(__XWORD, size);
+THIS^.setComparator(comparator);
+WHILE (currentSortSize <= size-1) DO
+	maximumLeftBound := size -2;
+	stepSize := 2*currentSortSize;
+	FOR leftBound := 0 TO maximumLeftBound BY (stepSize) DO
+		
+		IF leftBound+currentSortSize-1 < size-1 THEN
+			middle := leftBound + currentSortSize-1;
+		ELSE
+			middle := size-1;
+		END_IF
+		IF leftBound + stepSize - 1 < size THEN
+			rightBound := leftBound + stepSize -1;
+		ELSE
+			rightBound := size-1;
+		END_IF
+		
+		instantSort := merge(
+			firstContainer := ADR(container[leftBound]),
+			secondContainer := ADR(container[middle + 1]),
+			buffer := instantSortBuffer,
+			firstContainerSize := middle - leftBound + 1,
+			secondContainerSize := rightBound - middle 
+		);
+		IF instantSort <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS THEN
+			__DELETE(instantSortBuffer);
+			RETURN;
+		END_IF
+		
+		Tc2_System.MEMMOVE(
+			destAddr := ADR(container[leftBound]),
+			srcAddr := THIS^.sortBuffer,
+			n := rightBound - leftBound + 1
+		);
+	END_FOR
+END_WHILE
+
+currentListVersion := currentListVersion + 1;
+instantSort := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="sort" Id="{d7d063e7-d8a5-44eb-a243-7fed9fa79e0c}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure. 
+It uses the passed Comperator to sort the structure.
+This can take many cycles and should be called until the CNM_ReturnTypes.ExecutionState is no longer ``BUSY``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``ABORTED``: While sort was pending,execute had a falling edge,
+	``BUSY``: Sort is in progress
+	``ERROR``: Sort was not able to finish (p.e. List changed) call sort(false) to reset
+	``IDLE``: Currently no sort in progress
+	``SUCCESS``: Sorting was finished 
+
+*)
+METHOD sort	:CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*control bit to start or abort the sorting, needs to be active until the ExecutionState is SUCCESS*)
+	execute		:BOOL;
+	(*The size of the list to be sorted*)
+	size 		:UDINT;
+	(*the container, that contains the list elements*)
+	container	:POINTER TO CNM_AbstractObject.IObject;
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	:CNM_AbstractObject.IComparator		:= 0;
+END_VAR
+VAR_IN_OUT
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion :__XWORD;
+END_VAR
+VAR_INST
+	cycleManager :CNM_CycleManager.SimpleCycleManager;
+	lastExecute			:BOOL		:= FALSE;
+	executing 			:BOOL		:= FALSE;
+	state 				:CNM_ReturnTypes.SingleExecutionState	:= CNM_ReturnTypes.SingleExecutionState.IDLE; 
+	currentSortSize 	:UDINT;
+	startAt 			:UDINT 	:= 0;
+	(* list version index, used to detect list changes during sorting *)
+	lastListChangeIndex :__XWORD;
+END_VAR
+VAR 
+	leftBound 			:UDINT;
+	middle 				:UDINT;
+	rightBound 			:UDINT;
+	operationsThisCycle	:UDINT :=0;
+	leave 				:BOOL := FALSE;
+	mergeState 			:CNM_ReturnTypes.SingleExecutionResult;
+	maximumLeftBound	:UDINT;
+	stepSize 			:UDINT;
+END_VAR
+VAR CONSTANT
+	INIT :DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	SORT_LIST :DINT := INIT + 1;
+	CLEAN_UP :DINT := SORT_LIST + 1;
+	ERROR :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+	REGISTER_SIZE :UDINT := SIZEOF(__XWORD);
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[cycleManager(execute := execute);
+IF cycleManager.step.current > INIT THEN
+	cycleManager.assert.bitNumber.x.valueIsEqualTo(
+		currentValue := currentListVersion, 
+		expectedValue := lastListChangeIndex, 
+		message := 'list has changed during pending sorting'
+	);
+END_IF
+
+
+CASE cycleManager.step.current OF
+INIT:
+	cycleManager.configuration.sequence.requireSuccessStep := FALSE;
+	THIS^.setComparator(comparator);
+	lastListChangeIndex := currentListVersion;
+	startAt := 0;
+	IF size > 1 THEN
+		currentSortSize := 1;
+		__DELETE(THIS^.sortBuffer);
+		THIS^.sortBuffer := __NEW(__XWORD, size);
+		THIS^.maxOperationsPerCycle := size;
+		cycleManager.proceed();
+	ELSE
+		cycleManager.proceedWith(step := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS);
+	END_IF
+	
+SORT_LIST:
+	IF (lastListChangeIndex <> currentListVersion) THEN
+		cycleManager.proceedWith(ERROR);
+		sort := CNM_ReturnTypes.SingleExecutionState.ERROR;
+		RETURN;
+	END_IF
+	IF currentSortSize <= size-1 THEN
+		WHILE (operationsThisCycle < THIS^.maxCycleCompares) DO
+			maximumLeftBound := size -2;
+			stepSize := 2*currentSortSize;
+			FOR leftBound := startAt TO maximumLeftBound BY (stepSize) DO
+				IF (operationsThisCycle > THIS^.maxCycleCompares) THEN
+					leave := TRUE;
+					EXIT;
+				END_IF
+				
+				IF leftBound+currentSortSize-1 < size-1 THEN
+					middle := leftBound + currentSortSize-1;
+				ELSE
+					middle := size-1;
+				END_IF
+				IF leftBound + stepSize - 1 < size THEN
+					rightBound := leftBound + stepSize -1;
+				ELSE
+					rightBound := size-1;
+				END_IF
+				
+				mergeState := merge(
+					firstContainer := ADR(container[leftBound]),
+					secondContainer := ADR(container[middle + 1]),
+					buffer := THIS^.sortBuffer,
+					firstContainerSize := middle - leftBound + 1,
+					secondContainerSize := rightBound - middle 
+				);
+				IF mergeState <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS THEN
+					cycleManager.proceedWith(CNM_ReturnTypes.DefaultSteps.STEP.ERROR);
+					sort := CNM_ReturnTypes.SingleExecutionState.ERROR;
+					RETURN;
+				END_IF
+				Tc2_System.MEMMOVE(
+					destAddr := ADR(container[leftBound]),
+					srcAddr := THIS^.sortBuffer,
+					n := (rightBound - leftBound + 1) * REGISTER_SIZE
+				);
+				operationsThisCycle := operationsThisCycle + stepSize - 1;
+				
+			END_FOR
+			
+			IF leave THEN
+				startAt := leftBound;
+				EXIT;
+			ELSE
+				startAt := 0;
+				currentSortSize := stepSize;
+				IF currentSortSize > size-1 THEN
+					EXIT;
+				END_IF
+			END_IF
+		END_WHILE
+	END_IF
+
+	//check if sort done within same cycle
+	IF currentSortSize > size-1 THEN 
+		cycleManager.proceedWith(CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS);
+		IF THIS^.sortBuffer <> 0  THEN
+			__DELETE(sortBuffer);	
+		END_IF
+	END_IF
+	
+	lastListChangeIndex := currentListVersion := currentListVersion + 1;
+	
+CLEAN_UP,
+CNM_ReturnTypes.DefaultSteps.STEP.ERROR,
+CNM_ReturnTypes.DefaultSteps.STEP.ABORT,
+CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS:
+	IF THIS^.sortBuffer <> 0  THEN
+		__DELETE(sortBuffer);	
+	END_IF
+	
+END_CASE
+sort := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="ArrayListMergeSorter">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayListMergeSorter.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ArrayListMergeSorter.clone">
+      <LineId Id="1" Count="7" />
+      <LineId Id="11" Count="1" />
+      <LineId Id="9" Count="1" />
+    </LineIds>
+    <LineIds Name="ArrayListMergeSorter.FB_Exit">
+      <LineId Id="1" Count="3" />
+    </LineIds>
+    <LineIds Name="ArrayListMergeSorter.instantSort">
+      <LineId Id="1" Count="0" />
+      <LineId Id="41" Count="0" />
+      <LineId Id="2" Count="38" />
+    </LineIds>
+    <LineIds Name="ArrayListMergeSorter.sort">
+      <LineId Id="362" Count="0" />
+      <LineId Id="371" Count="0" />
+      <LineId Id="363" Count="6" />
+      <LineId Id="198" Count="0" />
+      <LineId Id="197" Count="0" />
+      <LineId Id="199" Count="0" />
+      <LineId Id="370" Count="0" />
+      <LineId Id="201" Count="0" />
+      <LineId Id="206" Count="0" />
+      <LineId Id="209" Count="5" />
+      <LineId Id="361" Count="0" />
+      <LineId Id="215" Count="0" />
+      <LineId Id="218" Count="0" />
+      <LineId Id="217" Count="0" />
+      <LineId Id="276" Count="0" />
+      <LineId Id="203" Count="0" />
+      <LineId Id="373" Count="3" />
+      <LineId Id="372" Count="0" />
+      <LineId Id="357" Count="0" />
+      <LineId Id="278" Count="3" />
+      <LineId Id="343" Count="2" />
+      <LineId Id="342" Count="0" />
+      <LineId Id="346" Count="0" />
+      <LineId Id="282" Count="9" />
+      <LineId Id="295" Count="9" />
+      <LineId Id="348" Count="0" />
+      <LineId Id="305" Count="1" />
+      <LineId Id="349" Count="4" />
+      <LineId Id="307" Count="4" />
+      <LineId Id="314" Count="0" />
+      <LineId Id="317" Count="6" />
+      <LineId Id="325" Count="6" />
+      <LineId Id="340" Count="1" />
+      <LineId Id="339" Count="0" />
+      <LineId Id="333" Count="1" />
+      <LineId Id="233" Count="0" />
+      <LineId Id="337" Count="0" />
+      <LineId Id="231" Count="0" />
+      <LineId Id="229" Count="1" />
+      <LineId Id="226" Count="2" />
+      <LineId Id="220" Count="0" />
+      <LineId Id="347" Count="0" />
+      <LineId Id="200" Count="0" />
+      <LineId Id="196" Count="0" />
+      <LineId Id="94" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

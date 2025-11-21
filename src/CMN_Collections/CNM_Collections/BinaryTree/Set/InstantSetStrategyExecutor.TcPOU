@@ -1,0 +1,203 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="InstantSetStrategyExecutor" Id="{34b0c06e-f8ce-4fb9-856b-2f8e58735512}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK INTERNAL InstantSetStrategyExecutor EXTENDS CNM_AbstractObject.Object IMPLEMENTS CNM_CollectionInterfaces.IInstantSetStrategy
+VAR
+	set :ISetHelper;
+END_VAR
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="assignSet" Id="{221399bd-d646-4996-b5ae-40c09341c146}">
+      <Declaration><![CDATA[METHOD INTERNAL assignSet
+VAR_INPUT
+	set :ISetHelper;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.set := set;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{7d52ab0d-e589-4c3f-961e-550ba5d60f04}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful for logging/debugging purpose.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{9d3f4e25-a486-4817-a1ab-051f10420958}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.InstantSetExecutorStrategy';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="intersect" Id="{c568d064-c3e8-4e7c-aeb4-bd3b32445e95}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the intersection of this set and the given set
+Set intersection: Common elements between two sets.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Intersection of A and B: {3, 4}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: if intersect is complete
+	``SingleExecutionResult.ABORTED``: foreign set wasn't valid
+
+*)
+METHOD intersect : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*foreign set to intersect with*)
+	set	: CNM_CollectionInterfaces.ISet;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[intersect := THIS^.set.instantIntersect(set := set);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="merge" Id="{f930d734-34f5-4e49-a5cc-80806fb3c2eb}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the union of this set and the given set
+Set union: Combination of all elements from two sets.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Union of A and B: {1, 2, 3, 4, 5, 6}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if merge completed
+	```SingleExecutionResult.ABORTED``: foreign set wasn't valid
+
+*)
+METHOD merge : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*foreign set to merge with*)
+	set	: CNM_CollectionInterfaces.ISet;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[merge := THIS^.set.instantMerge(set := set);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="subtract" Id="{1d45179f-2992-4d63-bd6d-d2b8bc78751f}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the set difference of this set and the given set
+Set difference: Elements present in one set but not in the other.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Set difference (A - B): {1, 2}
+Set difference (B - A): {5, 6}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: if insert could made, error if object was already in the tree,
+	```SingleExecutionResult.ABORTED``: foreign set wasn't valid
+
+*)
+METHOD subtract : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*foreign set to construct substraction*)
+	set	: CNM_CollectionInterfaces.ISet;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[subtract := THIS^.set.instantSubtract(set := set);
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="InstantSetStrategyExecutor">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="InstantSetStrategyExecutor.assignSet">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="InstantSetStrategyExecutor.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="InstantSetStrategyExecutor.intersect">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="InstantSetStrategyExecutor.merge">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="InstantSetStrategyExecutor.subtract">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

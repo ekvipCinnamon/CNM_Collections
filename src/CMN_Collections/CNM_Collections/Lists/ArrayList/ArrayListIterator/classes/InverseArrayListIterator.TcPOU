@@ -1,0 +1,94 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="InverseArrayListIterator" Id="{34a1e4f3-3275-4f0d-8866-1edde5bce32d}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This class can be used as a simple inverse iterator for array lists. It iterates from last element to first element.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK InverseArrayListIterator EXTENDS AbstractArrayListIterator
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="className" Id="{548187fc-6d6d-4e2a-9e12-60289d212544}">
+      <Declaration><![CDATA[PROPERTY className :CNM_AbstractObject.ClassName]]></Declaration>
+      <Get Name="Get" Id="{9159c530-53aa-496f-a515-f9c9450bc339}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'InverseArrayListIterator';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="FB_init" Id="{3c2ca2ae-0c0a-4d6f-bca8-dbab0ecc9e94}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The constructor ``FB_init`` is needed to create an unique hash code.
+The hash code is a pseudo random number create with a [xorshift](https://en.wikipedia.org/wiki/Xorshift) algorithm.
+It can be overwritten on derivations, because it will be called implicit, ``SUPER^.FB_init()`` is not required.
+For more information check: [Behavoir with derived function blocks](https://infosys.beckhoff.com/content/1033/tc3_plc_intro/5482088715.html?id=6983869892358031022).
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD FB_init : BOOL
+VAR_INPUT
+	(* if TRUE, the retain variables are initialized (warm start / cold start)*)
+	bInitRetains	: BOOL;
+	(* if TRUE, the instance afterwards gets moved into the copy code (online change) *)
+	bInCopyCode	: BOOL;
+	(* the array list which should be iterated, can be 0 *)
+	arrayList :REFERENCE TO ArrayList;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.direction := IterationDirection.BACKWARD;
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="InverseArrayListIterator">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="InverseArrayListIterator.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="InverseArrayListIterator.FB_init">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

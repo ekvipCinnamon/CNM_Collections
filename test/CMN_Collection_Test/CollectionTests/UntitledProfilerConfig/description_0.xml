@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ArrayOfProfilerDescription xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ProfilerDescription Id="12390982460379852467" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.LinkedListTest2.SortAndCheckPreviousElement.specialList" Offset="100747352" />
+  <ProfilerDescription Id="12390982460379852467" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.LinkedListTest2.LinkedListTest_2442__SortAndCheckPreviousElement_2454__specialList" Offset="100747352" />
+  <ProfilerDescription Id="7512457746911264043" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.LinkedListTest2" Offset="96385904" />
+  <ProfilerDescription Id="1409486309846984187" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.LinkedListTest2.SortAndCheckPreviousElement" Offset="96385904" />
+  <ProfilerDescription Id="1085428253095490229" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListMergeSorterTest.sortAndRescale.sortableList" Offset="134678160" />
+  <ProfilerDescription Id="1085428253095490229" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListTimSorterTest.sortAndRescale.sortableList" Offset="143076600" />
+  <ProfilerDescription Id="1085428253095490229" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListShellSorterTest.sortAndRescale.sortableList" Offset="151474928" />
+  <ProfilerDescription Id="1085428253095490229" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListMergeSorterTest.ContainerBasedArrayListSorterTest_2538__sortAndRescale_2551__sortableList" Offset="134678160" />
+  <ProfilerDescription Id="1085428253095490229" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListTimSorterTest.ContainerBasedArrayListSorterTest_2538__sortAndRescale_2551__sortableList" Offset="143076600" />
+  <ProfilerDescription Id="1085428253095490229" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListShellSorterTest.ContainerBasedArrayListSorterTest_2538__sortAndRescale_2551__sortableList" Offset="151474928" />
+  <ProfilerDescription Id="7737454832303834959" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListMergeSorterTest" Offset="130477480" />
+  <ProfilerDescription Id="7737454832303834959" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListTimSorterTest" Offset="138875920" />
+  <ProfilerDescription Id="7737454832303834959" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListShellSorterTest" Offset="147274248" />
+  <ProfilerDescription Id="402165913570954771" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListMergeSorterTest.sortAndRescale" Offset="130477480" />
+  <ProfilerDescription Id="402165913570954771" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListTimSorterTest.sortAndRescale" Offset="138875920" />
+  <ProfilerDescription Id="402165913570954771" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ArrayListShellSorterTest.sortAndRescale" Offset="147274248" />
+  <ProfilerDescription Id="8345734458391549346" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ClassTreeTest.removeElements.tree" Offset="0" />
+  <ProfilerDescription Id="8345734458391549346" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ClassTreeTest.nodesAreInCorrectOrderWithReverseOrderComparator.tree" Offset="0" />
+  <ProfilerDescription Id="8345734458391549346" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ClassTreeTest.insertElementsToCheckRotation.tree" Offset="0" />
+  <ProfilerDescription Id="8345734458391549346" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ClassTreeTest.insertElementInEmptyTree.tree" Offset="0" />
+  <ProfilerDescription Id="9609094362914769231" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ClassTreeTest" Offset="159901504" />
+  <ProfilerDescription Id="9051556231474987610" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ClassTreeTest.insertElementInEmptyTree" Offset="159901504" />
+  <ProfilerDescription Id="5200328644440458717" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ClassTreeTest.nodesAreInCorrectOrderWithReverseOrderComparator" Offset="159901504" />
+  <ProfilerDescription Id="17471692173126314629" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ClassTreeTest.insertElementsToCheckRotation" Offset="159901504" />
+  <ProfilerDescription Id="11137262430590473752" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ClassTreeTest.generateTestmessage" Offset="159901504" />
+  <ProfilerDescription Id="13468297440869059339" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ClassTreeTest.removeElements" Offset="159901504" />
+  <ProfilerDescription Id="3729766889619289942" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN.ClassTreeTest.checkNodeReverseOrder" Offset="159901504" />
+  <ProfilerDescription Id="7625923668379592734" QualifiedName="CMN_Collection_Test.CollectionTests.MAIN" Offset="0" />
+</ArrayOfProfilerDescription>

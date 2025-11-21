@@ -1,0 +1,152 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="AbstractDisposableContainer" Id="{d1b6ae7e-2d66-4654-abf0-f09e9fcddcfe}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+An abstract class to encapsulate 'destruct','deepDestruct' and 'fb_exit' logic.
+'destructContents' must be implemented in the concrete class.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+FUNCTION_BLOCK ABSTRACT AbstractDisposableContainer EXTENDS CNM_AbstractObject.Object
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="clearContents" Id="{32bcc27c-52a3-4d38-9c1f-e69efcfbbaa6}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD PROTECTED ABSTRACT clearContents
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="deepDestruct" Id="{3c6e658c-1596-4174-8152-d82a61deac22}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is a self-destruction if the object was created dynamically.
+If the object is a container class, the container content is destroyed with it.
+
+**Attention:** 
+	For derivations: **If a derived class needs ``deepDestruct`` this method must be overwritten.**
+	otherwise it just calls `Object.destruct`. 
+
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD deepDestruct
+VAR
+	(* __DELETE(THIS) is not allowed anymore in Tc 4026.
+       tmp is just a helper pointer that points to this instance *)
+	tmp : POINTER TO CNM_AbstractObject.Object;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (
+	Tc2_System.F_CheckMemoryArea(pData := THIS, nSize := SIZEOF(THIS^))
+	= Tc2_System.E_TcMemoryArea.Dynamic
+) THEN
+	tmp := THIS;
+	__DELETE(tmp);
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="destruct" Id="{bda473b8-d2e8-471c-8966-bbbea2f433b5}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is a self-destruction if the object was created dynamically.
+The disposable container provides the option to clear contents that should not be deleted.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FINAL destruct
+VAR
+	(* __DELETE(THIS) is not allowed anymore in Tc 4026.
+       tmp is just a helper pointer that points to this instance *)
+	tmp : POINTER TO CNM_AbstractObject.Object;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.clearContents();
+SUPER^.destruct();
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="AbstractDisposableContainer">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractDisposableContainer.clearContents">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractDisposableContainer.deepDestruct">
+      <LineId Id="1" Count="7" />
+    </LineIds>
+    <LineIds Name="AbstractDisposableContainer.destruct">
+      <LineId Id="11" Count="0" />
+      <LineId Id="3" Count="0" />
+      <LineId Id="12" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

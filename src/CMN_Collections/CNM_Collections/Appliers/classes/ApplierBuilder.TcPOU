@@ -1,0 +1,184 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="ApplierBuilder" Id="{72a0a456-43b7-4a2f-a3e2-591f0825581a}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK ApplierBuilder EXTENDS AbstractDisposableContainer IMPLEMENTS CNM_CollectionInterfaces.IApplierChainBuilder, CNM_CollectionInterfaces.IApplierChainContinue
+VAR
+	applierList 		:ArrayList;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="andThen" Id="{10c22a1f-f057-495b-a88f-5cbfcfa2b2b9}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Method to append another Applier to the chained applier.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``THIS^```IChainedApplier`
+
+*)
+
+
+METHOD andThen : CNM_CollectionInterfaces.IApplierChainContinue
+VAR_INPUT
+	applier :CNM_CollectionInterfaces.IApplier;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.applierList.append(applier);
+
+andThen := THIS^;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{6bfaef3b-505f-4dc2-956d-a424be1db291}">
+      <Declaration><![CDATA[PROPERTY className : CNM_AbstractObject.ClassName]]></Declaration>
+      <Get Name="Get" Id="{9d08beea-a693-4f15-87a7-6e46f9a76256}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'ApplierBuilder';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clearContents" Id="{a74afc0d-a0fa-4e33-b8fe-d27febca94aa}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD PROTECTED clearContents
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.applierList.clear();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Exit" Id="{177d1023-8a6a-4673-be73-702c3d57524d}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it stays in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectValid(THIS^.applierList) THEN
+	THIS^.applierList.deepDestruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="finish" Id="{ef20c6c0-e808-4c26-bd11-649d72a64d80}">
+      <Declaration><![CDATA[METHOD finish : CNM_CollectionInterfaces.IApplier
+VAR
+	object :CNM_AbstractObject.IObject;
+	chainedApplier :POINTER TO ChainedApplier;
+	applier1 :CNM_CollectionInterfaces.IApplier; 
+	applier2 :CNM_CollectionInterfaces.IApplier; 
+	applierNext :CNM_CollectionInterfaces.IApplier; 
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF(THIS^.applierList.size = 1)THEN
+	__QUERYINTERFACE(THIS^.applierList.dequeue(), finish);
+	THIS^.applierList.clear();
+ELSE
+	object := THIS^.applierList.dequeue();
+	__QUERYINTERFACE(object, applier1);
+	object := THIS^.applierList.dequeue();
+	__QUERYINTERFACE(object, applier2);
+	chainedApplier := __NEW(ChainedApplier(firstApplier := applier1, secondApplier := applier2));
+	WHILE(THIS^.applierList.size > 0)DO
+	object := THIS^.applierList.dequeue();
+		__QUERYINTERFACE(object, applierNext);
+		chainedApplier^.andThen(applierNext);
+	END_WHILE
+	finish := chainedApplier^;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="startWith" Id="{9a935377-89e0-4512-b55a-1f77d4ebda92}">
+      <Declaration><![CDATA[METHOD startWith : CNM_CollectionInterfaces.IApplierChainContinue
+VAR_INPUT
+	applier :CNM_CollectionInterfaces.IApplier;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.applierList.clear();
+THIS^.applierList.append(applier);
+
+startWith := THIS^;
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="ApplierBuilder">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="ApplierBuilder.andThen">
+      <LineId Id="1" Count="3" />
+    </LineIds>
+    <LineIds Name="ApplierBuilder.className.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="ApplierBuilder.clearContents">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="ApplierBuilder.FB_Exit">
+      <LineId Id="1" Count="3" />
+    </LineIds>
+    <LineIds Name="ApplierBuilder.finish">
+      <LineId Id="1" Count="16" />
+    </LineIds>
+    <LineIds Name="ApplierBuilder.startWith">
+      <LineId Id="1" Count="4" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

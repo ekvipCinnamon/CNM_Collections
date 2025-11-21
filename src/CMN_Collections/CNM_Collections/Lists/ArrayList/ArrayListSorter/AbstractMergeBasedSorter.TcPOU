@@ -1,0 +1,140 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="AbstractMergeBasedSorter" Id="{f8c11999-11ff-4a60-bf46-3da0a1abf305}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Abstract Sorter for merge based sort methods. 
+Provides a default implementation for an indexed merge function and a method to efficient copy elements.
+
+**Caution:**
+	Due to the characteristics of a merge, a merge must be performed atomically.
+	As a merge of two lists l1 and l2 can take up to l1.size+l2.size-1 compares.
+	That implies that at the last cycle of the merge, an atomic operation that requires up to list.size-1 compares must be performed.
+	Therefore the maxCycleCompares may be exceeded and set the maxCycleCompares to a value smaller than list.size-1 may not have the desired effect.
+ 
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+FUNCTION_BLOCK INTERNAL ABSTRACT AbstractMergeBasedSorter EXTENDS AbstractArrayListSorter
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="Protected" Id="{45f2ebda-ac95-423f-98f2-8116413a4df2}" />
+    <Method Name="merge" Id="{8cef1e75-db62-401c-9369-8b751c373179}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Function that sorts specified parts using a merge mechanism.
+Writes the result into a given buffer. 
+Buffer size must be at least as big as both given containers combined.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** CNM_ReturnTypes.ExecutionResult: the result of the merge,
+	ERROR if any parameter was invalid for merge 
+	SUCCESS if list is merged and result in buffer
+
+*)
+
+METHOD PROTECTED FINAL merge : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	firstContainer :POINTER TO CNM_AbstractObject.IObject;
+	secondContainer :POINTER TO CNM_AbstractObject.IObject;
+	buffer :POINTER TO CNM_AbstractObject.IObject;
+	firstContainerSize :UDINT;
+	secondContainerSize :UDINT;
+END_VAR
+VAR
+	leftIndex :UDINT;
+	rightIndex :UDINT;
+	destination :__XWORD;
+	source :__XWORD;
+	remainingElements :UDINT;
+END_VAR
+VAR CONSTANT
+	REGISTER_SIZE :UDINT := SIZEOF(__XWORD);
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[merge := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+RETURN (
+	(buffer = 0)
+	OR_ELSE (firstContainer = 0) 
+	OR_ELSE (secondContainer = 0)
+	OR_ELSE (firstContainer = secondContainer)
+);
+
+merge := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+RETURN (
+	((firstContainerSize + secondContainerSize) = 0) 
+);
+
+WHILE(
+	(rightIndex < secondContainerSize) 
+	AND_THEN (leftIndex < firstContainerSize)
+)DO
+	IF ( 
+		THIS^.compareElements(
+			firstContainer[leftIndex],secondContainer[rightIndex]
+		) <= CNM_ReturnTypes.ComparationResult.EQUAL
+	) THEN
+		buffer[leftIndex+rightIndex] := firstContainer[leftIndex];
+		leftIndex := leftIndex + 1;
+	ELSE
+		buffer[leftIndex+rightIndex] := secondContainer[rightIndex];
+		rightIndex := rightIndex + 1;
+	END_IF
+END_WHILE
+
+destination := ADR(buffer[leftIndex+rightIndex]);
+IF(leftIndex = firstContainerSize)THEN
+	source := ADR(secondContainer[rightIndex]);
+	remainingElements := secondContainerSize - rightIndex;
+ELSE
+	source := ADR(firstContainer[leftIndex]);
+	remainingElements := firstContainerSize - leftIndex;
+END_IF
+
+Tc2_System.MEMMOVE(
+	destAddr := destination,
+	srcAddr := source,
+	n := remainingElements * REGISTER_SIZE
+);
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="AbstractMergeBasedSorter">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractMergeBasedSorter.merge">
+      <LineId Id="1" Count="44" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

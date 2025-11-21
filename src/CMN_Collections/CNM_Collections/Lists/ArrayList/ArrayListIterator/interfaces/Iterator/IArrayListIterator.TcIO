@@ -1,0 +1,55 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <Itf Name="IArrayListIterator" Id="{1d1e5981-03a8-4456-90ff-fa29e4e1b253}">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This interface extends the IIterator interface for collections by the method attachArrayList().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+INTERFACE IArrayListIterator EXTENDS CNM_CollectionInterfaces.IIterator
+]]></Declaration>
+    <Method Name="attachArrayList" Id="{00b15f8d-f9d8-4d4a-b856-c18cea26e7a6}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method attaches an array list to the iterator.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD attachArrayList
+VAR_INPUT
+	(* The list to be attached. Should be a reference of type ``ArrayList`` *)
+	list :REFERENCE TO ArrayList;
+END_VAR
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

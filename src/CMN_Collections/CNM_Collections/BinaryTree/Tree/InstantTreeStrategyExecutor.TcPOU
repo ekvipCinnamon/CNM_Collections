@@ -1,0 +1,106 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="InstantTreeStrategyExecutor" Id="{cc0f6046-cde8-4b84-8583-f52cb67fcdd1}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK InstantTreeStrategyExecutor EXTENDS CNM_AbstractObject.Object IMPLEMENTS CNM_CollectionInterfaces.IInstantTreeStrategy
+VAR
+	tree :ITreeHelper;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="assignTree" Id="{5882d3f5-c750-4312-838d-a43a2f5d7bd7}">
+      <Declaration><![CDATA[METHOD INTERNAL assignTree
+VAR_INPUT
+	tree :ITreeHelper;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.tree := tree;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{1e81ccae-9288-46ba-8df4-94db5ed69ff2}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful for logging/debugging purpose.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{738bb93b-eb6e-4cf6-a6c5-d5103ce4f986}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.InstantTreeStrategyExecutor';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="insertCollection" Id="{6f7f49f9-33c8-4bcb-acc8-2c0ea1c24633}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method inserts all elements of a collection into the tree
+This takes only one cycle 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: operation successful
+	``SingleExecutionResult.ERROR``: out of memory
+	``SingleExecutionResult.ABORTED``: collection to insert wasn't valid
+
+*)
+METHOD insertCollection : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The collection that should be inserted*)
+	collection	: CNM_CollectionInterfaces.ICollection;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[insertCollection := THIS^.tree.instantInsertCollection(collection := collection);
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="InstantTreeStrategyExecutor">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="InstantTreeStrategyExecutor.assignTree">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="InstantTreeStrategyExecutor.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="InstantTreeStrategyExecutor.insertCollection">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

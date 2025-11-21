@@ -1,0 +1,144 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="InvertComparator" Id="{368293aa-ed5a-4218-94f1-b6c03563268f}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Internal comparator, which returns the opposite of the .compareTo method of object1.
+
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+FUNCTION_BLOCK INTERNAL InvertComparator EXTENDS CNM_AbstractObject.Object IMPLEMENTS CNM_AbstractObject.IComparator
+VAR
+	comparator :CNM_AbstractObject.IComparator;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="attachComparator" Id="{5cfcea95-17e5-458c-b031-553e8599ef7c}">
+      <Declaration><![CDATA[METHOD attachComparator
+VAR_INPUT
+	comparator :CNM_AbstractObject.IComparator;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.comparator := comparator;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{d2f13fdc-4313-419a-9d71-a65c07e415d1}">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{be1f1a19-7dea-4eb0-84bc-d8bd89c938a4}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.InvertComparator';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="compare" Id="{b5886194-7145-45d7-b80f-b1c156b61acd}">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method compares two objects, this is needed for sort orders.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SMALLER``: ``object1`` precedes in order,
+    ``EQUAL``: ``object1`` and ``object2`` at the same position in order,
+    ``GREATER``: ``object1`` is after in order. Checkout the library CNM_ReturnTypes.
+
+*)
+
+METHOD compare : CNM_AbstractObject.CNM_ReturnTypes.ComparationResult
+VAR_INPUT
+	(* first object to compare*)
+	object1	: CNM_AbstractObject.IObject;
+	(* second object to compare*)
+	object2	: CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//object2.compareTo(object1) is the inversion of object1.compareTo(object2);
+IF THIS^.isObjectValid(THIS^.comparator) THEN
+	compare := THIS^.comparator.compare(object2,object1); 
+ELSIF (THIS^.isObjectValid(object2)) THEN
+	compare := object2.compareTo(object1);
+ELSIF (THIS^.isObjectValid(object1)) THEN
+	compare := CNM_ReturnTypes.ComparationResult.GREATER;
+ELSE
+	compare := CNM_ReturnTypes.ComparationResult.EQUAL;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="InvertComparator">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="InvertComparator.attachComparator">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="InvertComparator.className.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="InvertComparator.compare">
+      <LineId Id="1" Count="4" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="6" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

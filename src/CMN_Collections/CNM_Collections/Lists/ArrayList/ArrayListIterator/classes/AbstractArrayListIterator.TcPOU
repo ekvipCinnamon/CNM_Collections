@@ -1,0 +1,321 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="AbstractArrayListIterator" Id="{31dffa3b-e0f8-48a1-8569-28cf551d3241}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+An abstract class to implement the basic datastructure dependency to array lists.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+FUNCTION_BLOCK ABSTRACT AbstractArrayListIterator EXTENDS AbstractIterator IMPLEMENTS IArrayListIterator
+VAR	
+	{attribute 'hide'}
+	list 			:REFERENCE TO ArrayList;
+	nextIndex 		:__XWORD;
+	direction 		:IterationDirection;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="attachArrayList" Id="{513068ee-fe61-4c15-afee-496f51c5342a}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method attaches an array list to the iterator.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD attachArrayList
+VAR_INPUT
+	(* The list to be attached. Should be a reference of type ``ArrayList`` *)
+	list :REFERENCE TO ArrayList;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.list REF= list;
+THIS^.reset();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{3deba71f-12ca-4ca9-b148-129107963499}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The constructor ``FB_init`` is needed to create an unique hash code.
+The hash code is a pseudo random number create with a [xorshift](https://en.wikipedia.org/wiki/Xorshift) algorithm.
+It can be overwritten on derivations, because it will be called implicit, ``SUPER^.FB_init()`` is not required.
+For more information check: [Behavoir with derived function blocks](https://infosys.beckhoff.com/content/1033/tc3_plc_intro/5482088715.html?id=6983869892358031022).
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD FB_init : BOOL
+VAR_INPUT
+	(* if TRUE, the retain variables are initialized (warm start / cold start)*)
+	bInitRetains	:BOOL;
+	(* if TRUE, the instance afterwards gets moved into the copy code (online change) *)
+	bInCopyCode	:BOOL;
+	(* the array list which should be iterated, can be 0 *)
+	arrayList :REFERENCE TO ArrayList;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.list REF= arrayList;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="hasNext" Id="{34dedba5-06a7-4832-bf5a-1ca212f94f92}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns if there exists another element to iterate to.
+
+**Example:**
+```
+WHILE(iterator.hasNext())DO
+	iterator.getNext().name;
+END_WHILE
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``TRUE``: Iterator has a next object that can be fetched with getNext()
+	``FALSE``: Iterator finished
+
+*)
+
+METHOD hasNext :BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[hasNext := THIS^.isObjectValid(THIS^.list) AND_THEN (THIS^.nextIndex < THIS^.list.size);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="iterate" Id="{b387c10f-9fa2-4b40-b216-f464e54697e0}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns the next object in the iteration and returns an execution state.
+**Example:**
+You have a list: 1 2 3
+the first iterate call will return CNM_ReturnTypes.BUSY and object = 1
+the second iterate call will return CNM_ReturnTypes.BUSY and object = 2
+the third iterate call will return CNM_ReturnTypes.BUSY and object = 3
+the forth iterate call will return CNM_ReturnTypes.SUCCESS and object = NULL
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionState.SUCCESS``: Iteration finished, no new elements, returned NULL object
+    ``SingleExecutionState.ERROR``: error during iteration
+    ``SingleExecutionState.ABORT``: iteration aborted
+    ``SingleExecutionState.BUSY``: returned an element and iteration in progress	
+    ``SingleExecutionState.IDLE``: ready for iteration
+
+*)
+METHOD FINAL iterate : CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*control bit to start or abort the iterate (see SingleExecutionState)*)
+	execute	: BOOL;
+END_VAR
+VAR_OUTPUT
+	(*the returned object of the iteration*)
+	object :CNM_AbstractObject.IObject;
+END_VAR
+VAR_INST	
+	lastChangeVersion :__XWORD;
+	cycleManager :CNM_CycleManager.SimpleCycleManager;
+END_VAR
+VAR CONSTANT
+	NULL :__XWORD := 0;
+	INIT :DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	ITERATING :DINT := INIT + 1;
+	ERROR :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+	SUCCESS :DINT := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[cycleManager(execute := execute);
+
+CASE cycleManager.step.current OF
+INIT:
+	cycleManager.configuration.sequence.requireSuccessStep := FALSE;
+	THIS^.nextIndex := 0;
+	lastChangeVersion := THIS^.list.changesToCollection;
+	THIS^.currentObject := 0;
+	IF(THIS^.hasNext())THEN
+		THIS^.currentObject := THIS^.list.container[SEL((THIS^.direction = IterationDirection.BACKWARD), THIS^.nextIndex, THIS^.list.size-1-THIS^.nextIndex)];
+		THIS^.nextIndex := THIS^.nextIndex+1;
+		IF(THIS^.isObjectValid(THIS^.currentObject))THEN
+			cycleManager.proceed();
+		ELSE
+			cycleManager.proceedWith(ERROR);				
+		END_IF
+	ELSE
+		THIS^.currentObject := NULL;
+		cycleManager.proceedWith(SUCCESS);
+	END_IF
+ITERATING:
+	IF (lastChangeVersion <>  THIS^.list.changesToCollection) THEN
+		cycleManager.proceedWith(ERROR);
+	ELSIF (THIS^.hasNext())THEN
+		THIS^.currentObject := THIS^.list.container[SEL((THIS^.direction = IterationDirection.BACKWARD), THIS^.nextIndex, THIS^.list.size-1-THIS^.nextIndex)];
+		THIS^.nextIndex := THIS^.nextIndex+1;
+		IF(NOT THIS^.isObjectValid(THIS^.currentObject))THEN
+			cycleManager.proceedWith(ERROR);				
+		END_IF
+	ELSE
+		THIS^.currentObject := NULL;
+		cycleManager.proceedWith(SUCCESS);
+	END_IF
+END_CASE
+
+object  := THIS^.currentObject;
+iterate := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="reset" Id="{e9fe4a8e-3b72-43f0-aed6-1a88a6f775f8}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method resets the iterator.
+
+**Example:**
+```
+iterator.reset();
+WHILE(iterator.moveNext())DO
+	foo := iterator.current.hashCode;
+	bar := iterator.current.name;
+END_WHILE
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD reset
+VAR CONSTANT
+	NULL :__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.iterate(execute := FALSE);
+THIS^.nextIndex := 0;
+THIS^.currentObject := NULL;
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="AbstractArrayListIterator">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractArrayListIterator.attachArrayList">
+      <LineId Id="2" Count="2" />
+    </LineIds>
+    <LineIds Name="AbstractArrayListIterator.FB_init">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractArrayListIterator.hasNext">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractArrayListIterator.iterate">
+      <LineId Id="54" Count="0" />
+      <LineId Id="71" Count="0" />
+      <LineId Id="70" Count="0" />
+      <LineId Id="72" Count="0" />
+      <LineId Id="89" Count="0" />
+      <LineId Id="75" Count="1" />
+      <LineId Id="74" Count="0" />
+      <LineId Id="78" Count="10" />
+      <LineId Id="77" Count="0" />
+      <LineId Id="90" Count="0" />
+      <LineId Id="103" Count="2" />
+      <LineId Id="93" Count="2" />
+      <LineId Id="98" Count="4" />
+      <LineId Id="91" Count="0" />
+      <LineId Id="73" Count="0" />
+      <LineId Id="106" Count="0" />
+      <LineId Id="56" Count="1" />
+      <LineId Id="44" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractArrayListIterator.reset">
+      <LineId Id="1" Count="3" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

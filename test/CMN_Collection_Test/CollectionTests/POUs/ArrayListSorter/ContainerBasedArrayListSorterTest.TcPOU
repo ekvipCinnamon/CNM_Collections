@@ -1,0 +1,159 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="ContainerBasedArrayListSorterTest" Id="{0b2e12f8-3ed9-498c-a269-d509a16fe4d0}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK ContainerBasedArrayListSorterTest EXTENDS CNM_CollectionTestLib.ListSorterTest
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	arrayListSorter :CNM_CollectionInterfaces.IArrayListSorter;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[SUPER^();
+__QUERYINTERFACE(THIS^.Sorter,arrayListSorter);
+THIS^.sortAndRescale(
+	valuesToSort := RANDOM_1000_INIT,
+	sorterToTest := arrayListSorter,
+	testInstanceIdentifier:='randomListRescale',
+	verboseLogging := THIS^.verboseLogging
+);
+]]></ST>
+    </Implementation>
+    <Method Name="sortAndRescale" Id="{8df64671-6ba9-48c5-b479-9d58635eeb1f}">
+      <Declaration><![CDATA[
+(*
+
+short summary
+=================
+Tests that sorting still works correctly, when the container is increased
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+parameters
+=========================
+
+*)
+
+METHOD sortAndRescale
+VAR_INPUT
+	(*the Identifier for the test*)
+	testInstanceIdentifier	:STRING(255);
+	(*The sorter that should be tested*)
+	sorterToTest			:CNM_CollectionInterfaces.IArrayListSorter;
+	(*Should be true when verbose messages should be printed (for example needed cycles)*)
+	verboseLogging			:BOOL;
+END_VAR
+VAR_IN_OUT
+	(*The values that should be sorted*)
+	valuesToSort 			:ARRAY[*] OF INT;
+END_VAR
+VAR_OUTPUT
+	(*True when sort is done*)
+	finishedSort 			:BOOL;
+	(*The amount of cycles used to sort the list*)
+	usedCycles 				:INT;
+END_VAR
+VAR
+	testname 				:STRING(255);
+	sorterName				:STRING(255);
+END_VAR
+VAR_INST
+	sortableList			:TestArrayList();
+	initTest 				:BOOL		:= TRUE; 
+	sortDone				:BOOL		:= FALSE;
+	cyclesTaken				:INT		:= 0;
+	evaluateResults			:BOOL		:= FALSE;
+	sortState				:CNM_ReturnTypes.SingleExecutionState;
+	listExtended			:BOOL		:= FALSE;
+	initialContainerSize	:__XWORD	:= 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[sorterName := SEL(THIS^.listFactory.isObjectValid(sorter),'internalSorter',Sorter.className);
+testname := Tc2_Standard.CONCAT('sortAndRescale.',Tc2_Standard.CONCAT(sorterName, Tc2_Standard.CONCAT('.',testInstanceIdentifier)));
+IF TEST_ORDERED(testname) THEN
+	IF initTest THEN
+		IF THIS^.listFactory.isObjectNull(sorter) THEN
+			//test does not work with internal sorter
+			TcUnit.TEST_FINISHED();
+			RETURN;
+		END_IF
+		//pretest
+		initTest := FALSE;
+		listExtended := FALSE;
+		cyclesTaken := 0;
+		appendArrayToList(listToInit := sortableList,initValues := valuesToSort);
+		sortableList.setSorter(sorterToTest);
+		sortState := sortableList.sort.ascending(FALSE);
+		initialContainerSize := sortableList.currentContainerSize;
+		sortDone := FALSE;
+		finishedSort := sortDone;
+			
+	ELSE
+		
+		//executeTest
+		
+		sortDone := FALSE;
+		finishedSort := sortDone;
+		IF NOT ((sortState := sortablelist.sort.ascending(TRUE)) = CNM_ReturnTypes.SingleExecutionState.SUCCESS) THEN 
+			cyclesTaken := cyclesTaken + 1;
+		END_IF;
+		IF sortState = CNM_ReturnTypes.SingleExecutionState.SUCCESS AND NOT listExtended THEN
+			WHILE sortableList.currentContainerSize = initialContainerSize DO
+				appendArrayToList(listToInit:= sortableList,initValues := valuesToSort);
+				sortableList.sort.ascending(FALSE);
+			END_WHILE
+			listExtended := TRUE;
+			sortState := CNM_ReturnTypes.SingleExecutionState.BUSY;
+		END_IF
+		usedCycles := cyclesTaken;
+		finishedSort := sortDone;
+		IF sorter.isObjectValid(sortableList) THEN
+			IF sortState = CNM_ReturnTypes.SingleExecutionState.SUCCESS THEN 
+				//The test is finished within the method "checkIfListSorted".
+				checkIfListSorted(initTest := initTest, testname := testname, sortDone := sortDone, cyclesTaken := cyclesTaken, sortableList := sortableList, comparator := 0);
+				finishedSort := sortDone;
+			ELSIF NOT (sortState = CNM_ReturnTypes.SingleExecutionState.BUSY) THEN
+				ASSERTTRUE(FALSE,'sorting ended with unsuspected executionstate'); 
+				Test_finished();
+				sortableList.deepDestruct();	
+				initTest := TRUE;
+				RETURN;
+			END_IF
+		ELSE
+			Test_finished();
+			sortableList.deepDestruct();	
+			initTest := TRUE;
+			RETURN;
+		END_IF
+	END_IF
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="ContainerBasedArrayListSorterTest">
+      <LineId Id="9" Count="0" />
+      <LineId Id="20" Count="0" />
+      <LineId Id="18" Count="0" />
+      <LineId Id="29" Count="5" />
+    </LineIds>
+    <LineIds Name="ContainerBasedArrayListSorterTest.sortAndRescale">
+      <LineId Id="3" Count="12" />
+      <LineId Id="18" Count="6" />
+      <LineId Id="33" Count="38" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

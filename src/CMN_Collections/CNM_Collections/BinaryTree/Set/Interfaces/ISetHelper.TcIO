@@ -1,0 +1,291 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <Itf Name="ISetHelper" Id="{1fc658a3-57ed-4cff-8dc7-c2e84e4b763f}">
+    <Declaration><![CDATA[INTERFACE INTERNAL ISetHelper EXTENDS CNM_AbstractObject.IObject
+]]></Declaration>
+    <Method Name="getEqualObject" Id="{997a2c00-b5a3-42dc-b81c-a0342823d798}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Searches an object that is equal to the provided object in terms of the compareTo method (or a comparator provided by the parent).
+ 
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``TRUE`` when an object that is equal is found, otherwise ``FALSE``
+
+*)
+
+METHOD INTERNAL getEqualObject :BOOL
+VAR_INPUT
+	(*The object to search for*)
+	object 	:CNM_AbstractObject.IObject;
+END_VAR
+VAR_OUTPUT
+	(*The found object or null if not found*)
+	foundObject :CNM_AbstractObject.IObject;
+END_VAR
+
+]]></Declaration>
+    </Method>
+    <Method Name="instantIntersect" Id="{acac1e3b-8176-4b2b-921a-843ad40a768d}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the intersection of this set and the given set
+Set intersection: Common elements between two sets.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Intersection of A and B: {3, 4}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: if intersect is complete
+	``SingleExecutionResult.ABORTED``: foreign set wasn't valid
+
+*)
+
+METHOD INTERNAL instantIntersect :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*foreign set to intersect with*)
+	set :CNM_CollectionInterfaces.ISet;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="instantMerge" Id="{db8ac256-6c56-421f-a3ab-b047d9a5008e}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the union of this set and the given set
+Set union: Combination of all elements from two sets.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Union of A and B: {1, 2, 3, 4, 5, 6}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if merge completed
+	```SingleExecutionResult.ABORTED``: foreign set wasn't valid
+
+*)
+
+METHOD INTERNAL instantMerge :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*foreign set to merge with*)
+	set :CNM_CollectionInterfaces.ISet;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="instantSubtract" Id="{ad8e59d0-f0af-4708-87db-0a5b70a6b74a}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the set difference of this set and the given set
+Set difference: Elements present in one set but not in the other.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Set difference (A - B): {1, 2}
+Set difference (B - A): {5, 6}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionResult.SUCCESS``: if insert could made, error if object was already in the tree,
+	```SingleExecutionResult.ABORTED``: foreign set wasn't valid
+
+*)
+
+METHOD INTERNAL instantSubtract :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*foreign set to construct substraction*)
+	set :CNM_CollectionInterfaces.ISet;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="intersect" Id="{14795f5e-f7b9-4a97-818b-33f6f168020c}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the intersection of this set and the given set
+Set intersection: Common elements between two sets.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Intersection of A and B: {3, 4}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if intersect is complete
+	``ABORTED``: execute has a falling edge during intersect,
+	``BUSY``: Intersect is in Progress
+	``ERROR``: the passed collection was not valid / contained invalid Elements
+
+*)
+
+METHOD INTERNAL intersect :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*foreign set to intersect with*)
+	set :CNM_CollectionInterfaces.ISet;
+	(*If intersect should be processed*)
+	execute		:BOOL;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="merge" Id="{7f7dd942-4954-4d54-86f9-8cbc4a4d3fb1}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the union of this set and the given set
+Set union: Combination of all elements from two sets.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Union of A and B: {1, 2, 3, 4, 5, 6}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if merge completed, 
+	``ABORTED``: execute has a falling edge during merge,
+	``BUSY``: merge is in Progress
+	``ERROR``: the passed collection where not valid / contained invalid Elements
+
+*)
+
+METHOD INTERNAL merge :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*foreign set to merge with*)
+	set :CNM_CollectionInterfaces.ISet;
+	(*If merge should be processed*)
+	execute		:BOOL;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="subtract" Id="{647b0312-a9c2-4023-80dc-00def0b52a67}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+overwrites the content of this set with the set difference of this set and the given set
+Set difference: Elements present in one set but not in the other.
+
+**Example:**
+Set A = {2, 3, 1, 4}
+Set B = {3, 5, 6, 4}
+
+Set difference (A - B): {1, 2}
+Set difference (B - A): {5, 6}
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if insert could made, error if object was already in the tree,
+	``ABORTED``: execute has a falling edge during insert,
+	``BUSY``: Insert is in Progress
+	``ERROR``: the passed collection where not valid / contained invalid Elements
+
+*)
+
+METHOD INTERNAL subtract :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*foreign set to construct substraction*)
+	set :CNM_CollectionInterfaces.ISet;
+	(*If substract should be processed*)
+	execute		:BOOL;
+END_VAR
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

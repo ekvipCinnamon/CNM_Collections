@@ -1,0 +1,238 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="CubicRootResizing" Id="{842e6b7e-8f25-460c-913c-980e788b6ad2}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This resizing strategy increases an capacity by a geometric factor of the cubic root of 2 (~1.26).
+After three consecutive growth steps, the capacity approximately doubles, which improves the chance of reusing previously freed memory blocks and helps to reduce heap fragmentation.
+The strategy is well-suited for memory-constrained or embedded environments where efficient memory reuse is more important than minimizing the number of reallocation operations.
+For downsizing the capacity is reduced if the new size is less then 25 % of the current capacity. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK CubicRootResizing EXTENDS CNM_AbstractObject.Object IMPLEMENTS CNM_CollectionInterfaces.IResizingStrategy
+VAR CONSTANT
+	(* cubic root of 2 *)
+	GROW_FACTOR :REAL := 1.259921049894873165;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="className" Id="{2d647824-ab39-4d33-a859-74fddd87a471}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful for logging/debugging purpose.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{ab68e628-2b1d-4878-8811-03ba1d02cf2f}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.CubicRootResizing';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="getDownscaledCapacity" Id="{d1e6bef4-d1ad-49b7-9a3a-1c20ffdccff3}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The method takes the requested size and the current capacity as input and determines the next suitable capacity value based on the implemented resizing strategy.
+The resulting capacity is returned as newCapacity.
+It returns true when a downsizing is needed within the used strategy, false if no resizing is needed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD getDownscaledCapacity : BOOL
+VAR_INPUT
+	(* the new size that is needed *)
+	requestedSize	: UDINT;
+	(* the current actual size of the container *)
+	currentCapacity	: UDINT;
+END_VAR
+VAR_OUTPUT
+	(* the calculated size of the container *)
+	newCapacity	: UDINT;
+END_VAR
+VAR CONSTANT
+	SHRINKING_THRESHOLD_MULTIPLIER :UDINT := 3;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (requestedSize < THIS^.initialSize) OR_ELSE (currentCapacity = 0) THEN 
+	newCapacity := THIS^.initialSize; 
+ELSE 
+	newCapacity := currentCapacity;  
+	// gradual shrink by cubic root of 0.5 with threshold 
+	WHILE ( newCapacity > SHRINKING_THRESHOLD_MULTIPLIER*requestedSize ) DO
+		newCapacity := TO_UDINT(TO_REAL(newCapacity) / THIS^.GROW_FACTOR);
+	END_WHILE
+END_IF;
+
+getDownscaledCapacity := (newCapacity <> currentCapacity);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getUpscaledCapacity" Id="{01795397-330a-4e57-adb1-37b0f27e84a3}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The method takes the requested size and the current capacity as input and determines the next suitable capacity value based on the implemented resizing strategy.
+The resulting capacity is returned as newCapacity. 
+It returns true when a resizing is needed wihtin the used strategy, false if no resizing is needed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD getUpscaledCapacity : BOOL
+VAR_INPUT
+	(* the new size that is needed *)
+	requestedSize	: UDINT;
+	(* the current actual size of the container *)
+	currentCapacity	: UDINT;
+END_VAR
+VAR_OUTPUT
+	(* the calculated size of the container *)
+	newCapacity	: UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (requestedSize < THIS^.initialSize) THEN
+	newCapacity := THIS^.initialSize;
+ELSE
+	newCapacity := SEL((currentCapacity = 0), newCapacity := currentCapacity, newCapacity := THIS^.initialSize);
+	WHILE (newCapacity < requestedSize) DO
+		newCapacity := TO_UDINT(TO_REAL(newCapacity) * THIS^.GROW_FACTOR);
+	END_WHILE
+END_IF
+getUpscaledCapacity := (newCapacity <> currentCapacity);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="initialSize" Id="{540c20cf-557f-4336-815e-0a988f26ff40}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns an inital size for an empty new array. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+PROPERTY initialSize : UDINT
+]]></Declaration>
+      <Get Name="Get" Id="{61f46fbf-74c1-4878-845c-6465e71d408c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[initialSize := 8;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="CubicRootResizing">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="CubicRootResizing.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="CubicRootResizing.getDownscaledCapacity">
+      <LineId Id="36" Count="0" />
+      <LineId Id="38" Count="2" />
+      <LineId Id="43" Count="2" />
+      <LineId Id="42" Count="0" />
+      <LineId Id="41" Count="0" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="35" Count="0" />
+    </LineIds>
+    <LineIds Name="CubicRootResizing.getUpscaledCapacity">
+      <LineId Id="6" Count="0" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="18" Count="0" />
+      <LineId Id="13" Count="2" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="3" Count="0" />
+      <LineId Id="17" Count="0" />
+    </LineIds>
+    <LineIds Name="CubicRootResizing.initialSize.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

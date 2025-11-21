@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<TcSmProject xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.beckhoff.com/schemas/2012/07/TcSmProject" TcSmVersion="1.0" TcVersion="3.1.4026.19">
+	<Project ProjectGUID="{F63B908E-619F-4650-AA4C-19D88E9CB071}" Target64Bit="true" ShowHideConfigurations="#x106">
+		<Plc>
+			<Project GUID="{88915E43-B975-4017-AC1B-A21A00EDF0F8}" Name="CNM_Collections" PrjFilePath="CNM_Collections\CNM_Collections.plcproj" TmcFilePath="CNM_Collections\CNM_Collections.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcHash="{ED13DC4A-6E54-1615-2DC4-5A9B7063B0FC}" TmcPath="CNM_Collections\CNM_Collections.tmc">
+					<Name>CNM_Collections Instance</Name>
+					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
+				</Instance>
+			</Project>
+		</Plc>
+	</Project>
+</TcSmProject>

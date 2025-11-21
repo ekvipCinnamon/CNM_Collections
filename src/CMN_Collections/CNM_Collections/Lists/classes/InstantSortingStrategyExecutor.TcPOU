@@ -1,0 +1,176 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="InstantSortingStrategyExecutor" Id="{0ccdb5ec-0ca5-4e19-bf9c-8f519ef15098}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK InstantSortingStrategyExecutor EXTENDS CNM_AbstractObject.Object IMPLEMENTS CNM_CollectionInterfaces.IInstantSortable
+VAR
+	usedList :IListHelpers;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="ascending" Id="{8d83725e-7d14-46c5-a1e8-1cb6682fb55d}">
+      <Declaration><![CDATA[(*
+## Short summary
+
+This method sorts the data structure immediately in an ascending order. 
+The sorting will be finished within method call.
+Uses the passed comparator or compareTo of the contained objects if no comparator is passed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``ABORTED``: While sort was pending,execute had a falling edge,
+	``ERROR``: Sort was not able to finish (p.e. List changed) call sort(false) to reset
+	``SUCCESS``: Sorting was finished 
+
+*)
+
+METHOD ascending : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ascending := THIS^.usedList.instantSorting(
+	order := SortingOrder.ASCENDING,
+	comparator := comparator
+); 
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="attachList" Id="{cb20b976-ed78-4336-a3cc-ae5888d73d6b}">
+      <Declaration><![CDATA[METHOD INTERNAL attachList
+VAR_INPUT
+	list :IListHelpers;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.usedList := list;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{d89e0488-575e-4e6d-bbc4-24aa889ca3c5}">
+      <Declaration><![CDATA[PROPERTY className : CNM_AbstractObject.ClassName]]></Declaration>
+      <Get Name="Get" Id="{02a25d9e-7e14-475e-950b-d1612903d947}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.InstantSortingStrategyExecutor';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="descending" Id="{93d77e8c-8d2e-4a00-8c00-d033535245f8}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure in a descending order, so from great to low.
+The sorting will be finished within method call.
+Uses the passed comparator or compareTo of the contained objects if no comparator is passed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``ABORTED``: While inverseSort was pending,execute had a falling edge,
+	``ERROR``: inverseSort was not able to finish (p.e. List changed) call inverseSort(false) to reset
+	``SUCCESS``: Inversing was finished 
+*)
+
+METHOD descending :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator :CNM_AbstractObject.IComparator := 0;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[descending := THIS^.usedList.instantSorting(
+	order := SortingOrder.DESCENDING,
+	comparator := comparator
+); 
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{2a666db5-87f2-4454-8622-73961988a2ba}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The constructor ``FB_init`` is needed to create an unique hash code.
+The hash code is a pseudo random number create with a [xorshift](https://en.wikipedia.org/wiki/Xorshift) algorithm.
+It can be overwritten on derivations, because it will be called implicit, ``SUPER^.FB_init()`` is not required.
+For more information check: [Behavoir with derived function blocks](https://infosys.beckhoff.com/content/1033/tc3_plc_intro/5482088715.html?id=6983869892358031022).
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD FB_init : BOOL
+VAR_INPUT
+	(* if TRUE, the retain variables are initialized (warm start / cold start)*)
+	bInitRetains	: BOOL;
+	(* if TRUE, the instance afterwards gets moved into the copy code (online change) *)
+	bInCopyCode	: BOOL;
+	(* the list it should be attached to *)
+	list :IListHelpers;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.usedList := list;
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="InstantSortingStrategyExecutor">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="InstantSortingStrategyExecutor.ascending">
+      <LineId Id="1" Count="4" />
+    </LineIds>
+    <LineIds Name="InstantSortingStrategyExecutor.attachList">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="InstantSortingStrategyExecutor.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="InstantSortingStrategyExecutor.descending">
+      <LineId Id="1" Count="4" />
+    </LineIds>
+    <LineIds Name="InstantSortingStrategyExecutor.FB_init">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

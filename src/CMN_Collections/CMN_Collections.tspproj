@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<TcSmProject xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.beckhoff.com/schemas/2012/07/TcSmProject" TcSmVersion="1.0" TcVersion="3.1.4024.25">
+	<Project ProjectGUID="{50799CAD-FD57-4F09-9001-9B7CA51E1F8C}" Target64Bit="true" SaveToTarget="false" ShowHideConfigurations="#x106">
+		<Plc>
+			<Project GUID="{CAF6B4F6-2934-46D8-935A-8363B97F95A1}" Name="CNM_Collections" PrjFilePath="CNM_Collections\CNM_Collections.plcproj" TmcFilePath="CNM_Collections\CNM_Collections.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x001e"/>
+		</Plc>
+	</Project>
+</TcSmProject>

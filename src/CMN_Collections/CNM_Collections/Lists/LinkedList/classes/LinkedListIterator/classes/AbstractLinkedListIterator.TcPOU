@@ -1,0 +1,317 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="AbstractLinkedListIterator" Id="{07b27c34-75c9-4734-8d45-e7f4aa472c79}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK ABSTRACT AbstractLinkedListIterator EXTENDS AbstractIterator IMPLEMENTS ILinkedListIterator
+VAR	
+	{attribute 'hide'}
+	list 				:REFERENCE TO LinkedList;
+	currentElement		:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	direction 			:IterationDirection;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="attachLinkedList" Id="{aed4db98-1663-416c-b218-6659313884f4}">
+      <Declaration><![CDATA[METHOD attachLinkedList : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	list :REFERENCE TO LinkedList;	
+END_VAR
+VAR CONSTANT
+	NULL :CNM_AbstractObject.IObject := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.currentElement := 0;
+THIS^.current := 0;
+attachLinkedList := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+IF THIS^.isObjectValid(list) THEN
+	THIS^.list REF= list;
+	THIS^.currentElement := SEL(THIS^.direction = IterationDirection.BACKWARD, list.head, list.last);
+	THIS^.currentObject := SEL(THIS^.isObjectValid(THIS^.currentElement), NULL, THIS^.currentElement.object);
+	attachLinkedList := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{1cddad46-f517-47e9-840d-86a752154f2c}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The constructor ``FB_init`` is needed to create an unique hash code.
+The hash code is a pseudo random number create with a [xorshift](https://en.wikipedia.org/wiki/Xorshift) algorithm.
+It can be overwritten on derivations, because it will be called implicit, ``SUPER^.FB_init()`` is not required.
+For more information check: [Behavoir with derived function blocks](https://infosys.beckhoff.com/content/1033/tc3_plc_intro/5482088715.html?id=6983869892358031022).
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD FB_init : BOOL
+VAR_INPUT
+	(* if TRUE, the retain variables are initialized (warm start / cold start)*)
+	bInitRetains	: BOOL;
+	(* if TRUE, the instance afterwards gets moved into the copy code (online change) *)
+	bInCopyCode	: BOOL;
+	(* list that is used to iterate*)
+	list :REFERENCE TO LinkedList;
+END_VAR
+VAR CONSTANT
+	NULL :__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.list REF= list;
+THIS^.currentObject := NULL;
+IF THIS^.isObjectValid(THIS^.list) THEN
+	THIS^.currentElement := SEL(THIS^.direction = IterationDirection.BACKWARD, THIS^.list.head, THIS^.list.last);
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="hasNext" Id="{29a379f6-7534-4466-bf74-0fd065198ba1}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns if there exists another element to iterate to.
+
+**Example:**
+```
+WHILE(iterator.hasNext())DO
+	iterator.getNext().foo();
+END_WHILE
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``TRUE``: Iterator has a next object that can be fetched with getNext()
+	``FALSE``: Iterator finished
+
+*)
+METHOD hasNext : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[hasNext := 
+THIS^.isObjectValid(THIS^.currentElement) 
+	AND_THEN 
+THIS^.isObjectValid(THIS^.currentElement.object);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="iterate" Id="{daa6ebea-3b99-4345-a104-0f0418f8567f}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns the next object in the iteration and returns an execution state.
+**Example:**
+You have a list: 1 2 3
+the first iterate call will return CNM_ReturnTypes.BUSY and object = 1
+the second iterate call will return CNM_ReturnTypes.BUSY and object = 2
+the third iterate call will return CNM_ReturnTypes.BUSY and object = 3
+the forth iterate call will return CNM_ReturnTypes.SUCCESS and object = NULL
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SingleExecutionState.SUCCESS``: Iteration finished, no new elements, returned NULL object
+    ``SingleExecutionState.ERROR``: error during iteration
+    ``SingleExecutionState.ABORT``: iteration aborted
+    ``SingleExecutionState.BUSY``: returned an element and iteration in progress	
+    ``SingleExecutionState.IDLE``: ready for iteration
+
+*)
+METHOD iterate : CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	execute		:BOOL;
+END_VAR
+VAR_OUTPUT
+	object 		:CNM_AbstractObject.IObject;
+END_VAR
+VAR_INST
+	(*holds the state BUSY till the next cycle*)
+	lastCycle	:BOOL;
+	lastChangeVersion :__XWORD;
+	cycleManager	:CNM_CycleManager.SimpleCycleManager;
+END_VAR
+VAR CONSTANT
+	NULL :__XWORD := 0;
+	INIT :DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	ERROR :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+	SUCCESS :DINT := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS;
+	ITERATING :DINT := INIT + 1;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[cycleManager(execute := execute);
+object := NULL;
+CASE cycleManager.step.current OF
+INIT:
+	lastChangeVersion := THIS^.list.listChangeIndex;
+	cycleManager.configuration.sequence.requireSuccessStep := FALSE;
+	IF (THIS^.list.size = 0) THEN
+		cycleManager.proceedWith(SUCCESS);
+	ELSE
+		THIS^.currentElement := SEL(THIS^.direction = IterationDirection.BACKWARD, THIS^.list.head, THIS^.list.last);
+		IF THIS^.isObjectValid(THIS^.currentElement) THEN
+			object := THIS^.currentElement.object;
+			THIS^.currentElement := SEL(THIS^.direction = IterationDirection.BACKWARD, THIS^.currentElement.next, THIS^.currentElement.previous);
+			cycleManager.proceed();
+		ELSE
+			cycleManager.proceedWith(ERROR);
+		END_IF
+	END_IF;
+ITERATING:
+	IF lastChangeVersion <> THIS^.list.listChangeIndex THEN
+		cycleManager.proceedWith(ERROR);
+	ELSE
+		IF (NOT THIS^.isObjectValid(THIS^.currentElement)) THEN
+			cycleManager.proceedWith(SUCCESS);
+		ELSIF (NOT THIS^.isObjectValid(THIS^.currentElement.object)) THEN
+			cycleManager.proceedWith(ERROR);
+		ELSE
+			object := THIS^.currentElement.object;
+			THIS^.currentElement := SEL(THIS^.direction = IterationDirection.BACKWARD, THIS^.currentElement.next, THIS^.currentElement.previous);
+		END_IF
+	END_IF
+END_CASE
+
+THIS^.currentObject := object;
+iterate := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="reset" Id="{ebbb5d77-912b-4fca-95b2-34101b2b225e}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method resets the iterator.
+
+**Example:**
+```
+iterator.reset();
+WHILE(iterator.moveNext())DO
+	foo := iterator.current.hashCode;
+	bar := iterator.current.name;
+END_WHILE
+```
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD reset
+VAR CONSTANT
+	NULL :__XWORD := 0; 
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectValid(THIS^.list) THEN
+	THIS^.currentElement := SEL(THIS^.direction = IterationDirection.BACKWARD, list.head, list.last);
+END_IF
+THIS^.iterate(FALSE);
+THIS^.currentObject := NULL;
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="AbstractLinkedListIterator">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractLinkedListIterator.attachLinkedList">
+      <LineId Id="14" Count="0" />
+      <LineId Id="17" Count="0" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="7" Count="1" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="20" Count="0" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="13" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractLinkedListIterator.FB_init">
+      <LineId Id="1" Count="5" />
+    </LineIds>
+    <LineIds Name="AbstractLinkedListIterator.hasNext">
+      <LineId Id="1" Count="2" />
+      <LineId Id="9" Count="1" />
+    </LineIds>
+    <LineIds Name="AbstractLinkedListIterator.iterate">
+      <LineId Id="47" Count="0" />
+      <LineId Id="78" Count="0" />
+      <LineId Id="48" Count="0" />
+      <LineId Id="63" Count="1" />
+      <LineId Id="72" Count="0" />
+      <LineId Id="74" Count="2" />
+      <LineId Id="65" Count="0" />
+      <LineId Id="69" Count="0" />
+      <LineId Id="66" Count="0" />
+      <LineId Id="94" Count="0" />
+      <LineId Id="79" Count="0" />
+      <LineId Id="73" Count="0" />
+      <LineId Id="77" Count="0" />
+      <LineId Id="70" Count="0" />
+      <LineId Id="68" Count="0" />
+      <LineId Id="67" Count="0" />
+      <LineId Id="80" Count="1" />
+      <LineId Id="83" Count="0" />
+      <LineId Id="85" Count="1" />
+      <LineId Id="88" Count="0" />
+      <LineId Id="90" Count="2" />
+      <LineId Id="95" Count="0" />
+      <LineId Id="87" Count="0" />
+      <LineId Id="82" Count="0" />
+      <LineId Id="62" Count="0" />
+      <LineId Id="93" Count="0" />
+      <LineId Id="49" Count="0" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="96" Count="0" />
+    </LineIds>
+    <LineIds Name="AbstractLinkedListIterator.reset">
+      <LineId Id="1" Count="1" />
+      <LineId Id="4" Count="3" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

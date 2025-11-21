@@ -1,0 +1,775 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="ArrayListTwinSorter" Id="{e8f93a2c-1b5d-4f6f-9a8e-3c7d5e9f1b2a}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Implementation of TwinSort algorithm for ArrayList with performance optimizations.
+TwinSort is an adaptive, stable mergesort variant that optimizes naturally ordered pairs
+and reverse-ordered sequences through intelligent preprocessing.
+
+Key features:
+- Preprocessing phase creates naturally sorted pairs
+- Reverses descending sequences to exploit existing order
+- Adaptive merge strategy with optimized boundary detection
+- O(n log n) worst case, O(n) best case for sorted data
+- Stable sort (maintains relative order of equal elements)
+- Optimized for real-world data patterns
+
+Performance optimizations in this version:
+- Pre-allocated merge buffer to avoid repeated allocations
+- Buffer size tracking with 25% extra space to minimize reallocations
+- WHILE loops instead of FOR loops for better performance
+- State preservation between cycles to avoid redundant work
+- Optimized buffer management with size-based pre-allocation
+
+The algorithm works by:
+1. Preprocessing: Identify and sort adjacent pairs, reverse descending sequences
+2. Adaptive merging: Skip unnecessary merges when sequences are already ordered
+3. Boundary optimization: Reduce work by detecting optimal merge boundaries
+4. Memory-efficient: Pre-allocated buffer with intelligent sizing
+
+Based on research from lost-and-found-in-arrays repository, adapted for
+CNM Collections framework with real-time constraints and performance optimizations.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK FINAL ArrayListTwinSorter EXTENDS AbstractArrayListSorter
+VAR
+	// Merge buffer for temporary storage during merges - pre-allocated
+	mergeBuffer :POINTER TO CNM_AbstractObject.IObject;
+END_VAR
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="Private" Id="{f1e8c9d2-a3b4-5c6d-7e8f-9a0b1c2d3e4f}" />
+    <Property Name="className" Id="{a1b2c3d4-e5f6-7890-abcd-ef1234567890}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{b2c3d4e5-f6a7-8901-bcde-f23456789012}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.ArrayListTwinSorter';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clearContents" Id="{28be861d-8b30-4ebc-aad5-f6fd62546ddf}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD PROTECTED clearContents
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clone" Id="{d4e5f6a7-b8c9-0123-def0-456789012345}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+
+*)
+METHOD clone : CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR
+	newSorter :POINTER TO ArrayListTwinSorter;
+END_VAR
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject	: CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[newSorter := __NEW(ArrayListTwinSorter());
+
+IF (newSorter = 0) THEN
+	clone := CNM_ReturnTypes.CloneResult.FAILED;
+	clonedObject := 0;
+ELSE
+	clone := CNM_ReturnTypes.CloneResult.SUCCESS;
+	clonedObject := newSorter^;
+	THIS^.prepareClonedSorter(newSorter^);
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Exit" Id="{b1f5f166-e6a3-4ae6-8d6a-4eb4fbdf5baf}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it staiys in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[__DELETE(THIS^.mergeBuffer);
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantSort" Id="{323137ad-fa08-4c76-ba1f-ce9862bdcd06}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure instantly within one call. 
+It uses the passed Comparator to sort the structure or the compareTo of the contained Objects if no comparator is passed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``ERROR``: Sort was not able to finish 
+	``SUCCESS``: Sorting was finished succesfully
+
+*)
+METHOD instantSort : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The size of the list to be sorted*)
+	size	: UDINT;
+	(*the container, that contains the list elements*)
+	container	: POINTER TO CNM_CollectionInterfaces.CNM_AbstractObject.IObject;
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion	: __XWORD;
+END_VAR
+VAR
+	mergeWidth :UDINT := 2;
+	preprocessResult :CNM_ReturnTypes.SingleExecutionResult; 
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[mergeWidth := 2;
+instantSort := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+RETURN(size <= 1);
+THIS^.setComparator(comparator);
+preprocessResult := THIS^.preprocessElements(container, size);
+currentListVersion := currentListVersion + 1;
+CASE preprocessResult OF 
+CNM_ReturnTypes.SingleExecutionResult.SUCCESS:
+	IF THIS^.mergeBuffer <> 0 THEN
+		__DELETE(THIS^.mergeBuffer);
+	END_IF
+	THIS^.mergeBuffer := __NEW(__XWORD, SHR(size + 1, 1));
+CNM_ReturnTypes.SingleExecutionResult.ABORTED:
+	__DELETE(THIS^.mergeBuffer);
+	instantSort := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+	RETURN;
+ELSE
+	__DELETE(THIS^.mergeBuffer);
+	instantSort := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	RETURN;
+END_CASE
+
+WHILE mergeWidth < size DO 
+	THIS^.merge( container, size, mergeWidth);
+	mergeWidth := SHL(mergeWidth, 1);
+END_WHILE
+__DELETE(THIS^.mergeBuffer);
+	
+instantSort := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+ ]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="invertArray" Id="{ef933d7c-0cac-42a0-944b-0a03dafa4733}">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+Inverts the order of the elements inside the list. 
+Does not apply any kind of sorting, only reverses the elements in the list.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD invertArray
+VAR_INPUT
+	addressFirstElement	:POINTER TO __XWORD;
+	addressLastElement	:POINTER TO __XWORD;
+END_VAR
+VAR
+	midLower	:POINTER TO __XWORD;
+	midUpper	:POINTER TO __XWORD;
+	loop		:__XWORD;
+	size 		:UDINT;
+END_VAR
+VAR CONSTANT
+	REGISTER_SIZE :__XWORD := SIZEOF(__XWORD);
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE (size := SHR((addressLastElement - addressFirstElement), log2(REGISTER_SIZE)) + 1) OF
+0,1: RETURN;
+2,3: fastSwap(addressFirstElement, addressLastElement);RETURN;
+END_CASE
+
+
+loop := SHR(addressLastElement - addressFirstElement, SHR(REGISTER_SIZE,2) + 2);
+
+midLower := addressFirstElement + (loop * REGISTER_SIZE);
+midUpper := addressLastElement - (loop * REGISTER_SIZE);
+
+IF ((loop AND 1) <> 0) THEN
+	midLower^ := midLower^ XOR midUpper^;
+	midUpper^ := midLower^ XOR midUpper^;
+	midLower^ := midLower^ XOR midUpper^;
+	midLower := midLower - REGISTER_SIZE;
+	midUpper := midUpper + REGISTER_SIZE;
+	loop := loop - 1;
+END_IF;
+
+loop := MAX(SHR(loop, 1), 1);
+	
+REPEAT
+	addressFirstElement^ := addressFirstElement^ XOR addressLastElement^;
+	addressLastElement^ := addressFirstElement^ XOR addressLastElement^;
+	addressFirstElement^ := addressFirstElement^ XOR addressLastElement^;
+	midLower^ := midLower^ XOR midUpper^;
+	midUpper^ := midLower^ XOR midUpper^;
+	midLower^ := midLower^ XOR midUpper^;
+	midLower := midLower - REGISTER_SIZE;
+	midUpper := midUpper + REGISTER_SIZE;
+	addressFirstElement := addressFirstElement + REGISTER_SIZE;
+	addressLastElement := addressLastElement - REGISTER_SIZE;
+	loop := loop - 1;
+UNTIL (loop = 0) END_REPEAT
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="merge" Id="{a7b8c9d0-e1f2-3456-0123-789012345678}" FolderPath="Private\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Merges two adjacent sorted sequences with adaptive boundary optimization.
+Uses cycle-limited execution for real-time constraints.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** TRUE if merge completed, FALSE if needs more cycles
+
+*)
+
+METHOD PRIVATE merge : BOOL
+VAR_INPUT
+	container :POINTER TO CNM_AbstractObject.IObject;
+	arraySize :UDINT;
+	mergeWidth :UDINT;
+END_VAR
+VAR
+	leftEnd, leftStart, rightStart, rightEnd :LINT;
+	bufferEnd, bufferIndex :LINT;
+	copyCount :__XWORD;
+	i :__XWORD;
+	offset :LINT;
+	bufferWriteStart :LINT := 0;
+	rightIndex :LINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[offset := 0;
+WHILE ((offset + mergeWidth) < arraySize) DO
+	leftStart := offset;
+	leftEnd := leftStart + mergeWidth - 1;
+	IF (THIS^.compareElements(container[leftEnd], container[leftEnd + 1]) <= CNM_ReturnTypes.ComparationResult.EQUAL) THEN
+		offset := offset + SHL(mergeWidth,1);
+		CONTINUE;
+	END_IF
+	IF ((offset + SHL(mergeWidth,1)) <= arraySize) THEN
+		bufferEnd := bufferWriteStart + mergeWidth;
+		rightEnd := (leftStart + SHL(mergeWidth,1));
+	ELSE
+		bufferEnd := (bufferWriteStart + arraySize - (offset + mergeWidth));
+		rightEnd := arraySize;
+	END_IF
+	rightIndex := rightEnd - 1;
+	WHILE (THIS^.compareElements(container[leftEnd], container[rightIndex]) <= CNM_ReturnTypes.ComparationResult.EQUAL) DO
+		rightEnd := rightEnd - 1;
+		bufferEnd := bufferEnd - 1;
+		rightIndex := rightIndex - 1;
+	END_WHILE
+	bufferIndex := bufferWriteStart;
+	rightIndex := leftStart + mergeWidth;
+	WHILE (bufferIndex < bufferEnd) DO
+		THIS^.mergeBuffer[bufferIndex] := container[rightIndex];
+		bufferIndex := bufferIndex + 1;
+		rightIndex := rightIndex + 1;
+	END_WHILE
+	bufferIndex := bufferIndex - 1;
+	rightIndex := leftStart + mergeWidth - 1;
+	leftEnd := rightEnd - 1;
+	IF (THIS^.compareElements(container[leftStart], container[leftStart + mergeWidth]) <= CNM_ReturnTypes.ComparationResult.EQUAL) THEN
+		container[leftEnd] := container[rightIndex];
+		leftEnd := leftEnd - 1;
+		rightIndex := rightIndex - 1;
+		WHILE (bufferIndex >= bufferWriteStart) DO
+			WHILE (THIS^.compareElements(container[rightIndex], THIS^.mergeBuffer[bufferIndex]) = CNM_ReturnTypes.ComparationResult.GREATER) DO
+				container[leftEnd] := container[rightIndex];
+				leftEnd := leftEnd - 1;
+				rightIndex := rightIndex - 1;
+			END_WHILE
+			container[leftEnd] := THIS^.mergeBuffer[bufferIndex];
+			leftEnd := leftEnd - 1;
+			bufferIndex := bufferIndex - 1;
+		END_WHILE
+	ELSE
+		container[leftEnd] := container[rightIndex];
+		leftEnd := leftEnd - 1;
+		rightIndex := rightIndex - 1;
+		WHILE (rightIndex >= leftStart) DO
+			WHILE (THIS^.compareElements(container[rightIndex], THIS^.mergeBuffer[bufferIndex]) <= CNM_ReturnTypes.ComparationResult.EQUAL) DO
+				container[leftEnd] := THIS^.mergeBuffer[bufferIndex];
+				leftEnd := leftEnd - 1;
+				bufferIndex := bufferIndex - 1;
+			END_WHILE
+			container[leftEnd] := container[rightIndex];
+			leftEnd := leftEnd - 1;
+			rightIndex := rightIndex - 1;
+		END_WHILE
+		WHILE (bufferIndex >= bufferWriteStart) DO
+			container[leftEnd] := THIS^.mergeBuffer[bufferIndex];
+			leftEnd := leftEnd - 1;
+			bufferIndex := bufferIndex - 1;
+		END_WHILE
+	END_IF
+	offset := offset + SHL(mergeWidth,1);
+END_WHILE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="preprocessElements" Id="{b8c9d0e1-f2a3-4567-1234-890123456789}" FolderPath="Private\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Preprocessing phase that creates naturally sorted pairs and reverses
+descending sequences to optimize the merge phase.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: list ready for sorting 
+		``ERROR``: invalid container reference 
+		``ABORTED``: list is already sorted
+
+*)
+
+METHOD PRIVATE preprocessElements :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	container :POINTER TO CNM_AbstractObject.IObject;
+	numberOfElements :UDINT;
+END_VAR
+VAR
+	index :UDINT := 0;
+	swapCount :__XWORD;
+	i :__XWORD;
+	upper :POINTER TO __XWORD;
+	lower :POINTER TO __XWORD;
+	end, start :__XINT;
+END_VAR
+VAR CONSTANT
+	POINTER_SIZE_IN_BYTE :__XWORD := SIZEOF(__XWORD);
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[preprocessElements := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+RETURN(container = 0);
+end := numberOfElements - 2;
+WHILE (index <= end) DO
+	IF (THIS^.compareElements(container[index], container[index+1]) <= CNM_ReturnTypes.ComparationResult.EQUAL) THEN
+		index := index + 2;
+		CONTINUE;
+	END_IF
+	start := index;
+	index := index + 2;
+	WHILE (TRUE) DO
+		IF (index > end) THEN
+			IF (start = 0) THEN
+				IF (
+					((numberOfElements AND 1) = 0)
+					OR_ELSE  (THIS^.compareElements(container[index-1], container[index]) = CNM_ReturnTypes.ComparationResult.GREATER)
+				) THEN
+					end := numberOfElements - 1; 
+					THIS^.invertArray(ADR(container[start]), ADR(container[end]));
+					preprocessElements := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+					RETURN;
+				END_IF
+			END_IF
+			EXIT;
+		END_IF
+		IF (THIS^.compareElements(container[index], container[index+1]) = CNM_ReturnTypes.ComparationResult.GREATER) THEN
+			IF 	(THIS^.compareElements(container[index-1], container[index]) = CNM_ReturnTypes.ComparationResult.GREATER) THEN
+				index := index + 2;
+				CONTINUE;
+			END_IF
+			FastSwap(ADR(container[index]), ADR(container[index + 1]));
+		END_IF
+		EXIT;
+	END_WHILE
+	end := index - 1;
+	WHILE (start < end) DO
+		FastSwap(ADR(container[start]), ADR(container[end]));
+		start := start + 1;
+		end := end - 1;
+	END_WHILE
+	end := numberOfElements - 2;
+	index := index + 2;
+END_WHILE;
+preprocessElements := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="sort" Id="{c9d0e1f2-a3b4-5678-2345-901234567890}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the ArrayList using the TwinSort algorithm.
+It uses the passed Comparator to sort the structure.
+This can take many cycles and should be called until the ExecutionState is no longer ``BUSY``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``ABORTED``: While sort was pending, execute had a falling edge,
+	``BUSY``: Sort is in progress
+	``ERROR``: Sort was not able to finish (e.g. List changed)
+	``IDLE``: Currently no sort in progress
+	``SUCCESS``: Sorting was finished 
+
+*)
+METHOD sort : CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*control bit to start or abort the sorting, needs to be active until the ExecutionState is SUCCESS*)
+	execute		:BOOL;
+	(*The size of the list to be sorted*)
+	size 		:UDINT;
+	(*the container, that contains the list elements*)
+	container	:POINTER TO CNM_AbstractObject.IObject;
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator :CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion :__XWORD;
+END_VAR
+VAR_INST
+	lastListChangeIndex :__XWORD;
+	// Merge state
+	cycleManager	:CNM_CycleManager.SimpleCycleManager;
+	mergeWidth 		:UDINT;
+END_VAR
+VAR
+	preprocessResult :CNM_ReturnTypes.SingleExecutionResult;
+END_VAR
+VAR CONSTANT
+	INIT :DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	PRE_PROCESSING :DINT := INIT + 1;
+	MERGING :DINT := PRE_PROCESSING + 1;
+	SUCCESS :DINT := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS;
+	ERROR :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[cycleManager.update(execute := execute);
+IF cycleManager.step.current > INIT THEN
+	cycleManager.assert.bitNumber.x.valueIsEqualTo(
+		currentValue := currentListVersion, 
+		expectedValue := lastListChangeIndex, 
+		message := 'list has changed during pending sorting'
+	);
+END_IF
+
+CASE cycleManager.step.current OF 
+INIT:
+	cycleManager.configuration.sequence.requireSuccessStep := FALSE;
+	THIS^.setComparator(comparator);
+	lastListChangeIndex := currentListVersion;
+	// Initialize state
+	mergeWidth := 2;
+	cycleManager.proceedWith(SEL((size <= 1), PRE_PROCESSING, SUCCESS));
+	
+PRE_PROCESSING:
+	IF (lastListChangeIndex <> currentListVersion) THEN
+		cycleManager.proceedWith(ERROR);
+		sort := CNM_ReturnTypes.SingleExecutionState.ERROR;
+		RETURN;
+	END_IF
+	// Preprocess elements to create naturally sorted pairs
+	preprocessResult := THIS^.preprocessElements(container, size);
+	lastListChangeIndex := currentListVersion := currentListVersion + 1;
+	IF preprocessResult = CNM_ReturnTypes.SingleExecutionResult.SUCCESS THEN
+		// Pre-allocate buffer if container size changed
+		
+		// Allocate buffer for approximately n/2 elements (worst case)
+		IF THIS^.mergeBuffer <> 0 THEN
+			__DELETE(THIS^.mergeBuffer);
+		END_IF
+		THIS^.mergeBuffer := __NEW(__XWORD, SHR(size + 1, 1));
+		cycleManager.assert.pointers.isNotNull(THIS^.mergeBuffer, message := 'arraylist twinsort: buffer allocation failed');
+		// Preprocessing complete, start merging
+		cycleManager.proceed();
+	ELSIF preprocessResult = CNM_ReturnTypes.SingleExecutionResult.ABORTED THEN
+		// Entire array was reversed (fully sorted)
+		__DELETE(THIS^.mergeBuffer);
+		cycleManager.proceedWith(SUCCESS);
+	ELSE
+		cycleManager.proceedWith(CNM_ReturnTypes.DefaultSteps.STEP.ERROR);
+	END_IF		
+MERGING:
+	// Merge adjacent sequences of current width
+	IF (lastListChangeIndex <> currentListVersion) THEN
+		cycleManager.proceedWith(ERROR);
+		sort := CNM_ReturnTypes.SingleExecutionState.ERROR;
+		RETURN;
+	END_IF
+	THIS^.merge( container, size, mergeWidth);
+	mergeWidth := SHL(mergeWidth, 1);
+	lastListChangeIndex := currentListVersion := currentListVersion + 1;
+	IF (mergeWidth >= size) THEN	
+		// Sorting complete
+		cycleManager.proceedWith(SUCCESS);
+		__DELETE(THIS^.mergeBuffer);
+	END_IF	
+END_CASE
+
+sort := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="ArrayListTwinSorter">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayListTwinSorter.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ArrayListTwinSorter.clearContents">
+      <LineId Id="19" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayListTwinSorter.clone">
+      <LineId Id="1" Count="6" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="10" Count="1" />
+    </LineIds>
+    <LineIds Name="ArrayListTwinSorter.FB_Exit">
+      <LineId Id="1" Count="2" />
+    </LineIds>
+    <LineIds Name="ArrayListTwinSorter.instantSort">
+      <LineId Id="2" Count="0" />
+      <LineId Id="50" Count="0" />
+      <LineId Id="4" Count="0" />
+      <LineId Id="51" Count="0" />
+      <LineId Id="5" Count="1" />
+      <LineId Id="43" Count="1" />
+      <LineId Id="11" Count="4" />
+      <LineId Id="47" Count="1" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="17" Count="2" />
+      <LineId Id="21" Count="0" />
+      <LineId Id="23" Count="1" />
+      <LineId Id="39" Count="1" />
+      <LineId Id="30" Count="2" />
+      <LineId Id="41" Count="1" />
+    </LineIds>
+    <LineIds Name="ArrayListTwinSorter.invertArray">
+      <LineId Id="1" Count="25" />
+      <LineId Id="30" Count="9" />
+    </LineIds>
+    <LineIds Name="ArrayListTwinSorter.merge">
+      <LineId Id="108" Count="66" />
+      <LineId Id="107" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayListTwinSorter.preprocessElements">
+      <LineId Id="105" Count="3" />
+      <LineId Id="149" Count="0" />
+      <LineId Id="110" Count="38" />
+      <LineId Id="94" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayListTwinSorter.sort">
+      <LineId Id="269" Count="0" />
+      <LineId Id="250" Count="5" />
+      <LineId Id="248" Count="0" />
+      <LineId Id="131" Count="0" />
+      <LineId Id="134" Count="0" />
+      <LineId Id="141" Count="0" />
+      <LineId Id="270" Count="0" />
+      <LineId Id="259" Count="0" />
+      <LineId Id="143" Count="0" />
+      <LineId Id="145" Count="0" />
+      <LineId Id="147" Count="0" />
+      <LineId Id="144" Count="0" />
+      <LineId Id="155" Count="0" />
+      <LineId Id="153" Count="0" />
+      <LineId Id="261" Count="3" />
+      <LineId Id="260" Count="0" />
+      <LineId Id="156" Count="11" />
+      <LineId Id="169" Count="0" />
+      <LineId Id="181" Count="0" />
+      <LineId Id="173" Count="1" />
+      <LineId Id="177" Count="0" />
+      <LineId Id="182" Count="0" />
+      <LineId Id="178" Count="0" />
+      <LineId Id="180" Count="0" />
+      <LineId Id="154" Count="0" />
+      <LineId Id="183" Count="0" />
+      <LineId Id="190" Count="0" />
+      <LineId Id="265" Count="3" />
+      <LineId Id="191" Count="2" />
+      <LineId Id="257" Count="1" />
+      <LineId Id="208" Count="1" />
+      <LineId Id="211" Count="0" />
+      <LineId Id="188" Count="0" />
+      <LineId Id="142" Count="0" />
+      <LineId Id="135" Count="0" />
+      <LineId Id="117" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

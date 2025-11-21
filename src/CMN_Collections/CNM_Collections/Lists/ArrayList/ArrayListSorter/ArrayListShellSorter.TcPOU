@@ -1,0 +1,449 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="ArrayListShellSorter" Id="{c234e469-aab4-45b3-ada9-9572edbae50f}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This FB sorts the list using a shellsort, which has O(n^(4/3)) runtime. Slower than merge or timsort but doesn't need additional memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK ArrayListShellSorter EXTENDS AbstractArrayListSorter
+VAR CONSTANT
+	MAX_COLUMNINDEX :UINT := 7;
+	//ciuras proposal for columns on shellsort
+	PREPARED_COLUMN_WIDTH :ARRAY[0..MAX_COLUMNINDEX] OF __XWORD := [1,4,10,23,57,132,301,701];
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+
+
+
+]]></ST>
+    </Implementation>
+    <Folder Name="Protected" Id="{4402f14a-47c0-4266-b0c3-12edb11a04dc}" />
+    <Property Name="className" Id="{b49047b3-8770-4930-a310-7a20e752a945}">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className :CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{649c659d-82c7-4166-a246-a4de8ad5d105}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.ArrayListShellSorter';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clearContents" Id="{f2ae07f0-8dc1-42e4-b1cb-e64454de4811}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD PROTECTED clearContents
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clone" Id="{0db3ae68-5965-450c-8b4b-a2cc8138fa86}">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are not cloned for this there is the method ``ICloneable.deepClone``.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+	``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+	``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support cloning
+
+*)
+METHOD clone	:CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject	:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	newSorter :POINTER TO ArrayListShellSorter;
+	sorter :CNM_CollectionInterfaces.IArrayListSorter;
+	object :CNM_AbstractObject.IObject;
+	clonedComparator :CNM_AbstractObject.IComparator;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[newSorter := __NEW(
+	ArrayListShellSorter()
+);
+
+IF (newSorter = 0) THEN
+	clone := CNM_ReturnTypes.CloneResult.FAILED;
+ELSE
+	clone := CNM_ReturnTypes.CloneResult.SUCCESS;
+	THIS^.prepareClonedSorter(newSorter^);
+	clonedObject := newSorter^;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantSort" Id="{a16ca56f-1765-4b7b-b57f-39e7e287350f}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure instantly within one call. 
+It uses the passed Comparator to sort the structure or the compareTo of the contained Objects if no comparator is passed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``ERROR``: Sort was not able to finish 
+	``SUCCESS``: Sorting was finished succesfully
+
+*)
+METHOD instantSort : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The size of the list to be sorted*)
+	size	: UDINT;
+	(*the container, that contains the list elements*)
+	container	: POINTER TO CNM_CollectionInterfaces.CNM_AbstractObject.IObject;
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+VAR_IN_OUT
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion	: __XWORD;
+END_VAR
+VAR_INST
+	cycleManager :CNM_CycleManager.SimpleCycleManager;
+	index 						:__XWORD 	:=0;	
+	columnindex 				:DINT;
+	columnwidth 				:__XWORD;
+	currentElementIndex 		:__XWORD;
+	insertElementIndex 			:__XWORD;
+	tmpElement 					:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[index := 0;
+IF size > 1 THEN
+	columnindex := THIS^.MAX_COLUMNINDEX;
+	WHILE (THIS^.PREPARED_COLUMN_WIDTH[columnindex] >= size) DO
+		columnindex := columnindex - 1;
+	END_WHILE
+	columnwidth := THIS^.PREPARED_COLUMN_WIDTH[columnindex];
+	THIS^.setComparator(comparator);
+ELSE
+	instantSort := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+	RETURN;
+END_IF
+
+WHILE columnindex >= 0  DO  
+	FOR currentElementIndex:=columnwidth TO size-1 DO
+		tmpElement := container[currentElementIndex]; 
+		insertElementIndex := currentElementIndex;
+		WHILE 	(insertElementIndex >= columnwidth) 
+			AND_THEN (THIS^.compareElements(container[insertElementIndex-columnwidth],tmpElement) = CNM_ReturnTypes.ComparationResult.GREATER)  
+		DO
+			container[insertElementIndex] := container[insertElementIndex-columnwidth];
+			insertElementIndex := InsertElementIndex-columnwidth;
+		END_WHILE
+		container[insertElementIndex] := tmpElement;
+	END_FOR
+	columnindex := columnindex - 1;
+	IF columnindex >= 0 THEN
+		columnwidth := THIS^.PREPARED_COLUMN_WIDTH[columnindex];
+	END_IF
+END_WHILE
+
+currentListVersion := currentListVersion + 1;
+instantSort := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="sort" Id="{2b354826-0f7e-4351-bc70-a36cc0766b25}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method sorts the data structure. 
+It uses the passed Comperator to sort the structure.
+This can take many cycles and should be called until the CNM_ReturnTypes.ExecutionState is no longer ``BUSY``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``ABORTED``: While sort was pending,execute had a falling edge,
+	``BUSY``: Sort is in progress
+	``ERROR``: Sort was not able to finish (p.e. List changed) call sort(false) to reset
+	``IDLE``: Currently no sort in progress
+	``SUCCESS``: Sorting was finished 
+
+*)
+METHOD sort	:CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*control bit to start or abort the sorting, needs to be active until the ExecutionState is SUCCESS*)
+	execute	: BOOL;
+	(*The size of the list to be sorted*)
+	size :UDINT;
+	(*the container, that contains the list elements*)
+	container	: POINTER TO CNM_AbstractObject.IObject;
+	(*the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_AbstractObject.IComparator	:= 0;
+END_VAR
+VAR_IN_OUT
+	(*the current version of the list, must change when the data in the list changes *)
+	currentListVersion :__XWORD;
+END_VAR
+VAR_INST
+	cycleManager :CNM_CycleManager.SimpleCycleManager;
+	index 						:__XWORD 	:=0;	
+	columnindex 				:DINT 		:= 11;
+	columnwidth 				:__XWORD;
+	currentElementIndex 		:__XWORD;
+	initCurrentElementIndex 	:__XWORD;
+	insertElementIndex 			:__XWORD;
+	tmpElement 					:CNM_AbstractObject.IObject;
+	(* list version index, used to detect list changes during sorting *)
+	lastListChangeIndex :__XWORD;
+END_VAR
+VAR 
+	leave 						:BOOL		:= FALSE;
+	operationsThisCycle 		:__XWORD	:=0;
+END_VAR
+VAR CONSTANT
+	INIT :DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	SORTING :DINT := INIT + 1;
+	SUCCESS :DINT := CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS;
+	ERROR :DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[cycleManager.update(execute := execute);
+IF cycleManager.step.current > INIT THEN
+	cycleManager.assert.bitNumber.x.valueIsEqualTo(
+		currentValue := currentListVersion, 
+		expectedValue := lastListChangeIndex, 
+		message := 'list has changed during pending sorting'
+	);
+END_IF
+
+CASE cycleManager.step.current OF
+INIT:
+	lastListChangeIndex := currentListVersion;
+	index := 0;
+	IF size > 1 THEN
+		columnindex := THIS^.MAX_COLUMNINDEX;
+		WHILE (THIS^.PREPARED_COLUMN_WIDTH[columnindex] >= size) DO
+			columnindex := columnindex - 1;
+		END_WHILE
+		columnwidth := THIS^.PREPARED_COLUMN_WIDTH[columnindex];
+		initCurrentElementIndex := columnwidth;
+		THIS^.setComparator(comparator);
+		cycleManager.proceed();
+	ELSE
+		cycleManager.proceedWith(SUCCESS);
+	END_IF
+SORTING:
+	IF (lastListChangeIndex <> currentListVersion) THEN
+		cycleManager.proceedWith(ERROR);
+		sort := CNM_ReturnTypes.SingleExecutionState.ERROR;
+		RETURN;
+	END_IF
+	WHILE columnindex >= 0  DO  
+		FOR currentElementIndex:=initCurrentElementIndex TO size-1 DO
+			tmpElement := container[currentElementIndex]; 
+			insertElementIndex := currentElementIndex;
+			WHILE insertElementIndex >= columnwidth  DO
+				operationsThisCycle := operationsThisCycle + 1;
+				IF (operationsThisCycle >= THIS^.maxCycleCompares) THEN
+					leave:=TRUE;
+				END_IF
+				IF THIS^.compareElements(container[insertElementIndex-columnwidth],tmpElement) = CNM_ReturnTypes.ComparationResult.GREATER THEN
+					container[insertElementIndex] := container[insertElementIndex-columnwidth];
+					insertElementIndex := InsertElementIndex-columnwidth;
+				ELSE
+					EXIT;
+				END_IF;
+			END_WHILE
+			container[insertElementIndex]:=tmpElement;
+			IF leave THEN
+				EXIT;
+			END_IF
+		END_FOR
+		
+		IF currentElementIndex >= size THEN
+			columnindex:=columnindex-1;
+			IF columnindex < 0 THEN
+				lastListChangeIndex := currentListVersion := currentListVersion + 1;
+				cycleManager.proceedWith(SUCCESS);
+			ELSE
+				columnwidth := THIS^.PREPARED_COLUMN_WIDTH[columnindex];
+			END_IF
+			initCurrentElementIndex := columnwidth;
+		ELSE 
+			initCurrentElementIndex := currentElementIndex;
+			lastListChangeIndex := currentListVersion := currentListVersion + 1;
+			EXIT;
+		END_IF
+	END_WHILE
+END_CASE
+
+sort := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="ArrayListShellSorter">
+      <LineId Id="3" Count="3" />
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayListShellSorter.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="ArrayListShellSorter.clearContents">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayListShellSorter.clone">
+      <LineId Id="1" Count="7" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="11" Count="0" />
+    </LineIds>
+    <LineIds Name="ArrayListShellSorter.instantSort">
+      <LineId Id="1" Count="34" />
+    </LineIds>
+    <LineIds Name="ArrayListShellSorter.sort">
+      <LineId Id="150" Count="0" />
+      <LineId Id="239" Count="5" />
+      <LineId Id="238" Count="0" />
+      <LineId Id="245" Count="0" />
+      <LineId Id="167" Count="1" />
+      <LineId Id="170" Count="0" />
+      <LineId Id="172" Count="0" />
+      <LineId Id="179" Count="0" />
+      <LineId Id="237" Count="0" />
+      <LineId Id="175" Count="2" />
+      <LineId Id="183" Count="0" />
+      <LineId Id="234" Count="0" />
+      <LineId Id="232" Count="0" />
+      <LineId Id="182" Count="0" />
+      <LineId Id="178" Count="0" />
+      <LineId Id="180" Count="1" />
+      <LineId Id="184" Count="0" />
+      <LineId Id="246" Count="1" />
+      <LineId Id="249" Count="1" />
+      <LineId Id="248" Count="0" />
+      <LineId Id="186" Count="11" />
+      <LineId Id="199" Count="20" />
+      <LineId Id="222" Count="0" />
+      <LineId Id="220" Count="1" />
+      <LineId Id="185" Count="0" />
+      <LineId Id="169" Count="0" />
+      <LineId Id="236" Count="0" />
+      <LineId Id="235" Count="0" />
+      <LineId Id="72" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

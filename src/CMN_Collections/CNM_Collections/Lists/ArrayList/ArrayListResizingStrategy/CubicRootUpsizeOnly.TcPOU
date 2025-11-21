@@ -1,0 +1,214 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <POU Name="CubicRootUpsizeOnly" Id="{99409692-3479-40f1-894a-e942a11b4a96}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This resizing strategy increases an capacity by a geometric factor of the cubic root of 2 (~1.26).
+After three consecutive growth steps, the capacity approximately doubles, which improves the chance of reusing previously freed memory blocks and helps to reduce heap fragmentation.
+The strategy is well-suited for memory-constrained or embedded environments where efficient memory reuse is more important than minimizing the number of reallocation operations.
+This strategy will not downsize the capacity, this means there is no shrinking possible. 
+It can be used for starage with constant max size, e.g. warehouse applications or shelfs.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK CubicRootUpsizeOnly EXTENDS CNM_AbstractObject.Object IMPLEMENTS CNM_CollectionInterfaces.IResizingStrategy
+VAR CONSTANT
+	(* cubic root of 2 *)
+	GROW_FACTOR :REAL := 1.259921049894873165;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="className" Id="{135d8782-fca3-42f9-a8f9-c8b0fb1684ba}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful for logging/debugging purpose.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{89875cb3-a26b-409d-9236-66c221831ed7}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.CubicRootUpsizeOnly';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="getDownscaledCapacity" Id="{3d099644-3549-4366-a113-38544ad4b413}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The method takes the requested size and the current capacity as input and determines the next suitable capacity value based on the implemented resizing strategy.
+The resulting capacity is returned as newCapacity.
+It returns true when a downsizing is needed within the used strategy, false if no resizing is needed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD getDownscaledCapacity : BOOL
+VAR_INPUT
+	(* the new size that is needed *)
+	requestedSize	: UDINT;
+	(* the current actual size of the container *)
+	currentCapacity	: UDINT;
+END_VAR
+VAR_OUTPUT
+	(* the calculated size of the container *)
+	newCapacity	: UDINT;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[newCapacity := currentCapacity;
+getDownscaledCapacity := FALSE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getUpscaledCapacity" Id="{73d1bdcc-1842-40c9-808b-3cad5e75c273}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The method takes the requested size and the current capacity as input and determines the next suitable capacity value based on the implemented resizing strategy.
+The resulting capacity is returned as newCapacity. 
+It returns true when a resizing is needed wihtin the used strategy, false if no resizing is needed.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD getUpscaledCapacity : BOOL
+VAR_INPUT
+	(* the new size that is needed *)
+	requestedSize	: UDINT;
+	(* the current actual size of the container *)
+	currentCapacity	: UDINT;
+END_VAR
+VAR_OUTPUT
+	(* the calculated size of the container *)
+	newCapacity	: UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (requestedSize < THIS^.initialSize) THEN
+	newCapacity := THIS^.initialSize;
+ELSE
+	newCapacity := SEL((currentCapacity = 0), newCapacity := currentCapacity, newCapacity := THIS^.initialSize);
+	WHILE (newCapacity < requestedSize) DO
+		newCapacity := TO_UDINT(TO_REAL(newCapacity) * THIS^.GROW_FACTOR);
+	END_WHILE
+END_IF
+getUpscaledCapacity := (newCapacity <> currentCapacity);
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="initialSize" Id="{5729004c-0b0f-4419-996c-77bc4f4b589b}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns an inital size for an empty new array. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+PROPERTY initialSize : UDINT
+]]></Declaration>
+      <Get Name="Get" Id="{38d6a20a-86b5-4eba-baa0-b3bf3f0a8a85}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[initialSize := 8;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="CubicRootUpsizeOnly">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="CubicRootUpsizeOnly.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="CubicRootUpsizeOnly.getDownscaledCapacity">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="CubicRootUpsizeOnly.getUpscaledCapacity">
+      <LineId Id="1" Count="10" />
+    </LineIds>
+    <LineIds Name="CubicRootUpsizeOnly.initialSize.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,252 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="TreeStrategyExecutor" Id="{f0f69923-1de4-4221-a29f-9b4c582ab374}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK TreeStrategyExecutor EXTENDS CNM_AbstractObject.Object IMPLEMENTS CNM_CollectionInterfaces.ITreeStrategy
+VAR
+	tree :ITreeHelper;
+	instantExecutor :InstantTreeStrategyExecutor;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="className" Id="{626201f9-1520-4f11-96e0-880a93fc92e2}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful for logging/debugging purpose.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{b51ad4c2-946d-4b7d-822f-0ac0d6c0e944}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.TreeStrategyExecutor';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="FB_init" Id="{336768f3-f108-411b-9a94-5d6a8f509bb1}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The constructor ``FB_init`` is needed to create an unique hash code.
+The hash code is a pseudo random number create with a [xorshift](https://en.wikipedia.org/wiki/Xorshift) algorithm.
+It can be overwritten on derivations, because it will be called implicit, ``SUPER^.FB_init()`` is not required.
+For more information check: [Behavoir with derived function blocks](https://infosys.beckhoff.com/content/1033/tc3_plc_intro/5482088715.html?id=6983869892358031022).
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+*)
+METHOD FB_init : BOOL
+VAR_INPUT
+	(* if TRUE, the retain variables are initialized (warm start / cold start)*)
+	bInitRetains	: BOOL;
+	(* if TRUE, the instance afterwards gets moved into the copy code (online change) *)
+	bInCopyCode	: BOOL;
+	(*the tree which this executor will dispatch to*)
+	tree :ITreeHelper;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.tree := tree;
+THIS^.instantExecutor.assignTree(tree);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="insert" Id="{25f6a29e-bb89-4d2a-ab89-b1901021b4bf}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+A method to insert a single element into the tree.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: operation successful
+	``ABORTED``: operation was aborted (implementation specific)
+	``ERROR``: out of memory
+
+*)
+METHOD insert : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*the object that should be inserted*)
+	object	: CNM_CollectionInterfaces.CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[insert := THIS^.tree.insert(object := object);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="insertCollection" Id="{7a4f8576-2e7f-455f-a701-dd1522cb8d25}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method inserts all elements of a collection into the tree.
+
+If any value of the collection could not be inserted because of duplication, operation isn't aborted, 
+insertion is tried for every element of the collection.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if insert could be made
+	``ABORTED``: execute has a falling edge during insert,
+	``BUSY``: Insert is in Progress
+	``ERROR``: the passed collection where not valid / contained invalid Elements
+	``IDLE``: method was never started
+
+*)
+METHOD insertCollection : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*The collection that should be inserted*)
+	collection	: CNM_CollectionInterfaces.ICollection;
+	(*If insert should be processed*)
+	execute	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[insertCollection := THIS^.tree.insertCollection(collection := collection, execute := execute);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="instant" Id="{1e089ab7-463b-4c55-8d50-6aff869bdd31}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns a fluent interface for immediate (wihtin one call) operations of tree.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY instant : CNM_CollectionInterfaces.IInstantTreeStrategy
+]]></Declaration>
+      <Get Name="Get" Id="{6b2b1536-320e-4be6-abaf-f01b99fa2ecc}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[instant := THIS^.instantExecutor;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="remove" Id="{8564183e-f094-440a-a82b-a4691e03216d}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Function to remove an object from the tree
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if remove could be made
+	``ABORTED``: if object wasn't in the tree
+	``ERROR``: if object wasn't valid
+
+*)
+METHOD remove : CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(* The object that should be removed *)
+	object	: CNM_CollectionInterfaces.CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[remove := THIS^.tree.remove(object := object);
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="TreeStrategyExecutor">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="TreeStrategyExecutor.className.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="TreeStrategyExecutor.FB_init">
+      <LineId Id="1" Count="2" />
+    </LineIds>
+    <LineIds Name="TreeStrategyExecutor.insert">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="TreeStrategyExecutor.insertCollection">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="TreeStrategyExecutor.instant.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="TreeStrategyExecutor.remove">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

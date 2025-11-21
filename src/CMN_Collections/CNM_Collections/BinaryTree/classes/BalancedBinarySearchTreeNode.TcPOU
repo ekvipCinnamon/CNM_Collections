@@ -1,0 +1,783 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="BalancedBinarySearchTreeNode" Id="{9a2580b1-3db3-4cb6-b036-6fe24adfc63f}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Class for a balanced, binary, search tree node
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK BalancedBinarySearchTreeNode EXTENDS AbstractDisposableContainer IMPLEMENTS CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode
+VAR
+	nodevalue 			:CNM_AbstractObject.IObject;
+	left 				:CNM_CollectionInterfaces.IBinaryTreeNode;
+	right				:CNM_CollectionInterfaces.IBinaryTreeNode;
+	nodebalance			:CNM_CollectionInterfaces.TreeBalance;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="IObjectWrapper" Id="{c0c83235-f911-4116-a530-8501139ead5d}" />
+    <Folder Name="Object" Id="{871adbfe-bcb8-4232-9ce0-cf45309c5b05}" />
+    <Property Name="balance" Id="{f06959e6-433d-42d1-a976-bc4a83cd8c64}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property represents the balance state for this node, for details see ``Tree_Balance`` from Interfacelib
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY balance :CNM_CollectionInterfaces.TreeBalance
+]]></Declaration>
+      <Get Name="Get" Id="{38ccc84b-d96b-4769-ba70-96814882da12}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[balance := THIS^.nodebalance;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{e8640b5a-e6c4-4bde-8954-0eec274dd678}">
+        <Declaration><![CDATA[
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.nodebalance := balance;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="className" Id="{6cb4c7e7-38a5-4c52-92a1-5f32ba74a28f}" FolderPath="Object\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className :CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{6d6ca7be-9d67-405d-9148-2a3e6c261a3b}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.BalancedBinarySearchTreeNode';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clearContents" Id="{761ab4fe-a2a9-4537-b58b-843e55c91f45}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD PROTECTED clearContents
+VAR CONSTANT
+	(* NULL is a constant which is always 0 *)
+	NULL						:__XWORD	:= 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.left := NULL;
+THIS^.right := NULL;
+THIS^.nodevalue := NULL;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clone" Id="{73b6c606-4936-46ae-ae59-ab09eceab725}" FolderPath="Object\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the content objects
+are not cloned, for this there is the method ``ICloneable.deepClone``.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails, because the
+attribute enable dynamic creation was forgotten, the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+	``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+	``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support cloning
+
+*)
+METHOD clone :CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject			:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	newTreeNode 			:POINTER TO BalancedBinarySearchTreeNode;
+	newChildObject			:CNM_AbstractObject.IObject;
+	newChildNode 			:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED 	:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[newTreeNode := __NEW(
+	BalancedBinarySearchTreeNode(
+		value := THIS^.object,
+		left := OBJECT_NOT_REFERENCED,
+		right := OBJECT_NOT_REFERENCED
+	)
+);
+IF (newTreeNode = 0) THEN
+	clone := CNM_ReturnTypes.CloneResult.FAILED;
+	RETURN;
+ELSIF THIS^.isObjectValid(newTreeNode^) THEN
+	clone := CNM_ReturnTypes.CloneResult.SUCCESS;
+	IF THIS^.isObjectValid(THIS^.left) THEN
+		clone := THIS^.left.clone(clonedObject => newChildObject);
+		__QUERYINTERFACE(newCHildObject,newChildNode);
+		newTreeNode^.leftChild := newChildNode;
+	END_IF
+	IF THIS^.isObjectValid(THIS^.right) AND clone = CNM_ReturnTypes.CloneResult.SUCCESS THEN
+		clone := THIS^.right.clone(clonedObject => newChildObject);
+		__QUERYINTERFACE(newCHildObject,newChildNode);
+		newTreeNode^.rightChild := newChildNode;
+	END_IF
+	clonedObject := newTreeNode^;
+	RETURN(clone = CNM_ReturnTypes.CloneResult.SUCCESS);		
+ELSE
+	clone := CNM_ReturnTypes.CloneResult.FAILED;
+END_IF
+
+//clone wasn't success, clean up
+IF THIS^.isObjectValid(newTreeNode^) THEN
+	THIS^.destructNodeAndAllChilds(newTreeNode^);
+	clonedObject := OBJECT_NOT_REFERENCED;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="compareTo" Id="{35b58a8b-ea82-4f1a-a34d-61840f6569fe}" FolderPath="Object\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method compares a foreign object with the own one, this is needed for sort orders.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SMALLER``: ``THIS`` precedes in order,
+	``EQUAL``: ``THIS`` and ``object`` at the same position in order,
+	``GREATER``: ``THIS`` is after in order.
+	Checkout the library CNM_ReturnTypes.
+
+*)
+METHOD compareTo :CNM_AbstractObject.CNM_ReturnTypes.ComparationResult
+VAR_INPUT
+	(* foreign object to compare*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+VAR 
+	node 	:CNM_CollectionInterfaces.IBinaryTreeNode;
+	compareObject	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[compareTo := CNM_AbstractObject.CNM_ReturnTypes.ComparationResult.GREATER;
+IF THIS^.isObjectValid(object) THEN 
+	IF(__QUERYINTERFACE(object,node)) THEN
+		compareObject := node.object;
+	ELSE
+		compareObject := object;
+	END_IF
+	
+	IF(THIS^.isObjectValid(THIS^.object))THEN     
+		compareTo := THIS^.object.compareTo(compareObject);
+	END_IF
+END_IF
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="deepClone" Id="{763afdab-27b1-4eb6-944f-a10e0d10f70e}" FolderPath="Object\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are cloned too.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+If something goes wrong, then this method must clean up everything
+that has been cloned and free the memory again.
+**The deepClone either works completely, or not at all**
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+	``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+	``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support deep cloning
+
+*)
+METHOD deepClone :CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject			:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	newTreeNode 			:POINTER TO BalancedBinarySearchTreeNode;
+	newChildObject			:CNM_AbstractObject.IObject;
+	newChildNode 			:CNM_CollectionInterfaces.IBinaryTreeNode;
+	newContent				:CNM_AbstractObject.IObject;
+	cloneResult 			:CNM_ReturnTypes.CloneResult;
+END_VAR
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED 	:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF ( NOT THIS^.isObjectValid(THIS^.object)) THEN
+	deepClone := CNM_ReturnTypes.CloneResult.FAILED;
+	RETURN;
+ELSIF ((cloneResult := THIS^.object.deepClone(clonedObject => newContent)) <> CNM_ReturnTypes.CloneResult.SUCCESS) THEN
+	deepClone := cloneResult;
+	RETURN;
+END_IF
+
+newTreeNode := __NEW(
+	BalancedBinarySearchTreeNode(
+		value := newContent,
+		left := OBJECT_NOT_REFERENCED,
+		right := OBJECT_NOT_REFERENCED
+	)
+);
+IF (newTreeNode = 0) THEN
+	newContent.deepDestruct();
+	deepClone := CNM_ReturnTypes.CloneResult.FAILED;
+	RETURN;
+ELSIF THIS^.isObjectValid(newTreeNode^) THEN
+	deepClone := CNM_ReturnTypes.CloneResult.SUCCESS;
+	IF THIS^.isObjectValid(THIS^.left) THEN
+		deepClone := THIS^.left.deepClone(clonedObject => newChildObject);
+		__QUERYINTERFACE(newCHildObject,newChildNode);
+		newTreeNode^.leftChild := newChildNode;
+	END_IF
+	IF THIS^.isObjectValid(THIS^.right) AND deepClone = CNM_ReturnTypes.CloneResult.SUCCESS THEN
+		deepClone := THIS^.right.deepClone(clonedObject => newChildObject);
+		__QUERYINTERFACE(newCHildObject,newChildNode);
+		newTreeNode^.rightChild := newChildNode;
+	END_IF
+	clonedObject := newTreeNode^;
+	RETURN(deepClone = CNM_ReturnTypes.CloneResult.SUCCESS);		
+ELSE
+	deepClone := CNM_ReturnTypes.CloneResult.FAILED;
+END_IF
+
+//deepclone wasn't success, clean up
+
+IF THIS^.isObjectValid(newTreeNode^) THEN
+	newTreeNode^.deepDestruct();
+	clonedObject := OBJECT_NOT_REFERENCED;
+ELSIF THIS^.isObjectValid(newContent) THEN
+	newContent.deepDestruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="destructNodeAndAllChilds" Id="{bb6fe0bd-ddd8-480a-ac0e-d0fecedc1091}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+destructs / deepdestructs all nodes in the subtrees of a specified node and this node
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED FINAL destructNodeAndAllChilds
+VAR_INPUT
+	(*the node that should be destructed with all it's childs*)
+	node							:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED			:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[RETURN(THIS^.isObjectNull(node));
+IF THIS^.isObjectValid(node.leftChild) THEN
+	THIS^.destructNodeAndAllChilds(node := node.leftChild);
+	node.leftChild := OBJECT_NOT_REFERENCED;
+END_IF
+IF THIS^.isObjectValid(node.rightChild) THEN
+	THIS^.destructNodeAndAllChilds(node := node.rightChild);
+	node.rightChild := OBJECT_NOT_REFERENCED;
+END_IF
+node.destruct();	
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Exit" Id="{7c79a496-049d-4190-a2c5-9b8696ca2b5e}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it staiys in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF THIS^.isObjectValid(THIS^.nodevalue) THEN
+	THIS^.nodevalue.deepDestruct();
+END_IF
+IF THIS^.isObjectValid(THIS^.left) THEN
+	THIS^.left.deepDestruct();
+END_IF
+IF THIS^.isObjectValid(THIS^.right) THEN
+	THIS^.right.deepDestruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{75f22aab-1098-47fc-bed3-1417f5d76389}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The constructor ``FB_init`` is needed to create an unique hash code.
+The hash code is a pseudo random number create with a [xorshift](https://en.wikipedia.org/wiki/Xorshift) algorithm.
+It can be overwritten on derivations, because it will be called implicit, ``SUPER^.FB_init()`` is not required.
+For more information check: [Behavoir with derived function blocks](https://infosys.beckhoff.com/content/1033/tc3_plc_intro/5482088715.html?id=6983869892358031022).
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD FB_init : BOOL
+VAR_INPUT
+	(* if TRUE, the retain variables are initialized (warm start / cold start)*)
+	bInitRetains	:BOOL;
+	(* if TRUE, the instance afterwards gets moved into the copy code (online change) *)
+	bInCopyCode		:BOOL;  
+	value 						:CNM_AbstractObject.IObject;
+	left 						:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+	right 						:CNM_CollectionInterfaces.IBalancedBinarySearchTreeNode;
+END_VAR
+VAR
+	{attribute 'hide'}
+	newHashstate3				:CNM_AbstractObject.Hashcode;
+END_VAR
+VAR CONSTANT
+	{attribute 'hide'}
+	NUMBER_OF_LEFT_SHIFTS		:UINT	:= 17;
+	{attribute 'hide'}
+	NUMBER_OF_LEFT_ROTATIONS	:UINT   := 45;
+	OBJECT_NOT_REFERENCED 		:__XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.object := value;
+THIS^.right := right;
+THIS^.left := left;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="leftChild" Id="{e89366dc-6011-494a-a99d-4a377f2fb5d7}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property points to the left child of a binary tree node.
+The injected node will be deleted within the deepdestruct context. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY leftChild :CNM_CollectionInterfaces.IBinaryTreeNode
+]]></Declaration>
+      <Get Name="Get" Id="{b461900c-9f4d-47e0-933d-df6b9fed4392}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[leftChild := THIS^.left;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{04592fee-cd8f-46a0-840a-2428af664f9a}">
+        <Declaration><![CDATA[VAR CONSTANT
+	OBJECT_NOT_REFERENCED :__XWORD := 0;
+END_VAR
+
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF THIS^.isObjectValid(leftChild) THEN
+	THIS^.left := leftChild;
+ELSE
+	THIS^.left := OBJECT_NOT_REFERENCED;
+END_IF
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="object" Id="{2336d34d-61a2-446d-a047-a564cbea203b}" FolderPath="IObjectWrapper\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+The property points to the content of the treenode. 
+The object will be deleted within the deepdestruct context.
+
+**Attention:** object is not allowed to be null since collections aren't allowed to contain null objects!
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+PROPERTY object :CNM_AbstractObject.IObject
+]]></Declaration>
+      <Get Name="Get" Id="{0a2e9d18-1a8a-46b7-b34a-03b0c603988f}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[object := THIS^.nodevalue;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{91ddca6c-941b-496c-b279-cb63fbc50613}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.nodevalue := object;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="rightChild" Id="{85179df1-37f5-4ec7-a717-5a1ca1a92535}">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+This property points to the right child of an binarytreeenode.
+The injected node will be deleted within the deepdestruct context.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY rightChild :CNM_CollectionInterfaces.IBinaryTreeNode
+]]></Declaration>
+      <Get Name="Get" Id="{5a5b1d79-9d10-47aa-a78c-76b0984e79ff}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[rightChild := THIS^.right;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{e97616b7-10b6-4cd4-9a29-b25ee13a5e0c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+VAR CONSTANT
+	OBJECT_NOT_REFERENCED : __XWORD := 0;
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF THIS^.isObjectValid(rightChild) THEN
+	  THIS^.right := rightChild;
+ELSE
+	  THIS^.right := OBJECT_NOT_REFERENCED;
+END_IF
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <LineIds Name="BalancedBinarySearchTreeNode">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.balance.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.balance.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.clearContents">
+      <LineId Id="3" Count="0" />
+      <LineId Id="6" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.clone">
+      <LineId Id="232" Count="6" />
+      <LineId Id="263" Count="1" />
+      <LineId Id="266" Count="0" />
+      <LineId Id="265" Count="0" />
+      <LineId Id="240" Count="17" />
+      <LineId Id="259" Count="2" />
+      <LineId Id="47" Count="0" />
+      <LineId Id="262" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.compareTo">
+      <LineId Id="180" Count="0" />
+      <LineId Id="34" Count="0" />
+      <LineId Id="67" Count="0" />
+      <LineId Id="174" Count="1" />
+      <LineId Id="177" Count="1" />
+      <LineId Id="112" Count="0" />
+      <LineId Id="179" Count="0" />
+      <LineId Id="116" Count="0" />
+      <LineId Id="73" Count="0" />
+      <LineId Id="68" Count="0" />
+      <LineId Id="75" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.deepClone">
+      <LineId Id="184" Count="0" />
+      <LineId Id="397" Count="1" />
+      <LineId Id="396" Count="0" />
+      <LineId Id="186" Count="0" />
+      <LineId Id="189" Count="0" />
+      <LineId Id="187" Count="0" />
+      <LineId Id="185" Count="0" />
+      <LineId Id="99" Count="6" />
+      <LineId Id="399" Count="0" />
+      <LineId Id="403" Count="0" />
+      <LineId Id="400" Count="0" />
+      <LineId Id="402" Count="0" />
+      <LineId Id="401" Count="0" />
+      <LineId Id="320" Count="0" />
+      <LineId Id="310" Count="1" />
+      <LineId Id="327" Count="1" />
+      <LineId Id="312" Count="0" />
+      <LineId Id="309" Count="0" />
+      <LineId Id="314" Count="0" />
+      <LineId Id="329" Count="1" />
+      <LineId Id="315" Count="0" />
+      <LineId Id="110" Count="1" />
+      <LineId Id="392" Count="1" />
+      <LineId Id="112" Count="0" />
+      <LineId Id="319" Count="0" />
+      <LineId Id="318" Count="0" />
+      <LineId Id="114" Count="0" />
+      <LineId Id="321" Count="1" />
+      <LineId Id="394" Count="0" />
+      <LineId Id="389" Count="1" />
+      <LineId Id="50" Count="0" />
+      <LineId Id="324" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.destructNodeAndAllChilds">
+      <LineId Id="1" Count="10" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.FB_Exit">
+      <LineId Id="1" Count="9" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.FB_init">
+      <LineId Id="47" Count="0" />
+      <LineId Id="52" Count="1" />
+      <LineId Id="106" Count="0" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.leftChild.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.leftChild.Set">
+      <LineId Id="1" Count="5" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.object.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.object.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.rightChild.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="BalancedBinarySearchTreeNode.rightChild.Set">
+      <LineId Id="1" Count="5" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

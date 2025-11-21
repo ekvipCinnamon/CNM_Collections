@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <Itf Name="IListHelpers" Id="{9c6ed3a5-42c7-4fd3-b7bb-e16568516abc}">
+    <Declaration><![CDATA[INTERFACE INTERNAL IListHelpers EXTENDS CNM_CollectionInterfaces.IList
+]]></Declaration>
+    <Method Name="instantSorting" Id="{6cc885a5-d6c0-4dcc-9bc9-3b385c831140}">
+      <Declaration><![CDATA[METHOD INTERNAL instantSorting : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	order :SortingOrder;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Property Name="listChangeIndex" Id="{2ccdb378-67a6-45bf-b603-a3bacaca39fc}">
+      <Declaration><![CDATA[PROPERTY INTERNAL listChangeIndex : __XWORD]]></Declaration>
+      <Get Name="Get" Id="{4cba27f1-b150-4ae1-8253-1a513d28aa71}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{2431a82e-daca-48d1-997f-0529c79173d3}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Method Name="sorting" Id="{ccdd8f20-52ca-48e9-a06a-b4bc96aabdd7}">
+      <Declaration><![CDATA[METHOD INTERNAL sorting : CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	execute :BOOL;
+	order :SortingOrder;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

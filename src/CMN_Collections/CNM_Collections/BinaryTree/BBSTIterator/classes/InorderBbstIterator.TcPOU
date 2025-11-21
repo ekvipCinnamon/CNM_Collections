@@ -1,0 +1,221 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.12">
+  <POU Name="InorderBbstIterator" Id="{4fef9d0a-2102-4c00-aa6b-a2793d341d7e}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+This class implements in order iteration strategy (sorted) for balanced binary search trees.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK InorderBbstIterator EXTENDS AbstractBalancedBinarySearchTreeIterator
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="Protected" Id="{d2e77de2-3849-4c66-b688-e3c08478daf9}" />
+    <Property Name="className" Id="{7f117583-6e68-4e76-9411-01049ae7a705}">
+      <Declaration><![CDATA[PROPERTY className :CNM_AbstractObject.ClassName]]></Declaration>
+      <Get Name="Get" Id="{8933afca-dfc3-4f6f-8f5b-7552c1d7b1c9}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.InorderBBSTIterator';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="fillNodeListUntilLeftMost" Id="{76c391b3-91a1-4a6f-af6d-8e6fa8e864a0}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Searches the smallest childnode starting with the given node.
+All visited nodes, will be added to the nodelist. This includes the smallest node as well.
+ 
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** the successor node if found, or null if no successor exists
+
+*)
+
+METHOD PROTECTED FINAL fillNodeListUntilLeftMost
+VAR_INPUT
+	startNode	:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR
+	currentNode :CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR CONSTANT 
+	OBJECT_NOT_REFERENCED	:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[RETURN(THIS^.isObjectNull(startNode));
+currentNode := startNode;
+WHILE(THIS^.isObjectValid(currentNode)) DO
+	THIS^.nodeList.append(currentNode);
+	currentNode := currentNode.leftChild;
+END_WHILE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getNextTreeNode" Id="{10897f02-5322-44da-b3cb-31e366282323}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Gets the next node that iterate should process.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``TRUE`` a valid node existed, ``FALSE`` no node for iteration existed
+
+*)
+
+METHOD PROTECTED getNextTreeNode :BOOL
+VAR_OUTPUT
+	node	:CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+VAR
+	tmpObject	:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[tmpObject := THIS^.nodeList.pop();
+__QUERYINTERFACE(tmpObject, node);
+getNextTreeNode := THIS^.isObjectValid(node);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="getStartNode" Id="{41a5e585-194a-48e5-8316-94b26ce9e50b}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called to retrive the first node of the iteration.
+Might have sideeffects, like changes to THIS^.nodelist.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED getStartNode : CNM_CollectionInterfaces.IBinaryTreeNode
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.fillNodeListUntilLeftMost(THIS^.root);
+__QUERYINTERFACE(THIS^.nodeList.pop(), getStartNode);
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="processNode" Id="{b1ffde92-366f-4822-a9a3-fca5301ba5a0}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method appends (if they exists) the left and right child of the node to the nodelist.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED processNode
+VAR_INPUT
+	nodeToProcess	: CNM_CollectionInterfaces.IBinaryTreeNode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.fillNodeListUntilLeftMost(nodeToProcess.rightChild);
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="InorderBbstIterator">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="InorderBbstIterator.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="InorderBbstIterator.fillNodeListUntilLeftMost">
+      <LineId Id="9" Count="0" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="21" Count="1" />
+      <LineId Id="19" Count="0" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="25" Count="0" />
+    </LineIds>
+    <LineIds Name="InorderBbstIterator.getNextTreeNode">
+      <LineId Id="1" Count="2" />
+    </LineIds>
+    <LineIds Name="InorderBbstIterator.getStartNode">
+      <LineId Id="1" Count="0" />
+      <LineId Id="5" Count="1" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="InorderBbstIterator.processNode">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

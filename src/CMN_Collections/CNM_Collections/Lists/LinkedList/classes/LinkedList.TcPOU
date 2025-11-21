@@ -1,0 +1,1813 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.13">
+  <POU Name="LinkedList" Id="{29c35684-bbd8-4ce7-a507-ccee57d0d6df}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+## Short summary
+
+Implementation of ILinkedList.
+Does not allow empty objects as data!
+
+**Warning:**
+	Calling __DELETE directly on a Collection will bypass the destruct Context and therefore also delete the contained elements.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK LinkedList EXTENDS AbstractList IMPLEMENTS ILinkedListHelpers
+VAR
+	headElement				:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	lastElement				:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	injectedSorter			:CNM_CollectionInterfaces.ILinkedListSorter;
+	(*true if the sorter were created inside this list, false if set from outside*)
+	listChangedDuringSort 	:BOOL	:= FALSE;
+	listChangedIterate 		:BOOL	:= FALSE;
+	
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="IInvertable" Id="{0ddf3c89-b43e-4aac-a394-db8ba6fb5987}" />
+    <Folder Name="IList" Id="{035599c8-6802-4373-86bb-2f1eaca55091}">
+      <Folder Name="ICollection" Id="{34f645eb-a570-411e-9bed-b58910b25f0a}" />
+    </Folder>
+    <Folder Name="Internal" Id="{27af7da1-59f8-4dc2-8c02-1c15688755df}" />
+    <Folder Name="IObject" Id="{2a754def-4293-4cd8-b8c5-1444d44b361e}" />
+    <Folder Name="Protected" Id="{0632f25c-580f-4f0e-841c-ce84f42b785f}" />
+    <Method Name="announceListChange" Id="{6f3c380c-b2d7-4bb6-8f2b-346bd9918d70}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called every time the list changes and can notify other components.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED announceListChange
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.listChangedIterate := TRUE;
+THIS^.changesToCollection := THIS^.changesToCollection+1;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="append" Id="{1c23982d-e1a5-4051-a8e9-62d72f7808f1}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds the given object to the end of the list.
+Adding NULL-Objects or THIS^ to the list is not possible.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: prepend was successful
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: allocation of container for new element failed, list not changed 
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or this list was passed
+
+*)
+METHOD append :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The object to be appended*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	newElement 	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED 	:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[append := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN (THIS^.isObjectNull(object) OR THIS^.isEqual(object));
+	
+RETURN( 
+	(append := THIS^.collectionFactory.getNewDoublyLinkedElement(
+		object				:= object,
+		previousElement		:= THIS^.lastElement,
+		nextElement			:= IS_NOT_REFERENCED,
+		linkElements		:= TRUE,
+		element 			=> newElement)
+	) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS 
+);
+
+THIS^.last := newElement;
+IF(THIS^.isObjectNull(THIS^.head))THEN
+	THIS^.head := THIS^.last;
+END_IF
+
+THIS^.incrementSize();
+THIS^.announceListChange();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="appendCollection" Id="{784f2d7c-76be-45c2-a973-2a59c0fae8eb}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds all elements of the given collection to the end of this list.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: new Container not needed / could be allocated and data was copied
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: new Container couldn't be allocated, container left unchanged
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or the list itself was passed
+
+*)
+METHOD appendCollection :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The collection to be appended*)
+	collectionToAppend	:CNM_CollectionInterfaces.ICollection;
+END_VAR
+VAR
+	collectionElement 	:CNM_AbstractObject.IObject;
+	oldLast				:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	destructElement		:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	nextElement			:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	iterator			:CNM_CollectionInterfaces.IIterator;
+	iterateState		:CNM_ReturnTypes.SingleExecutionState;
+END_VAR
+VAR CONSTANT
+	NULL :__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[appendCollection := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN(THIS^.isEqual(collectionToAppend) OR_ELSE THIS^.isObjectNull(collectionToAppend) );
+oldLast := THIS^.last;
+appendCollection := collectionToAppend.createNewIterator(iterator => iterator);
+RETURN(appendCollection <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS);
+iterateState := iterator.iterate(FALSE);
+iterateState := iterator.iterate(TRUE, object => collectionElement);
+WHILE ((
+		THIS^.isObjectValid(collectionElement)
+	) AND (
+		appendCollection = CNM_ReturnTypes.SingleExecutionResult.SUCCESS
+	) AND (
+		iterateState = CNM_ReturnTypes.SingleExecutionState.BUSY
+	)
+)DO
+	appendCollection := THIS^.append(collectionElement);
+	iteratestate := iterator.iterate(TRUE, object => collectionElement);
+END_WHILE
+
+IF (appendCollection = CNM_ReturnTypes.SingleExecutionResult.ERROR) THEN
+	THIS^.last := oldLast;
+	destructElement := oldLast.next;
+	WHILE (THIS^.isObjectValid(destructElement)) DO
+		nextElement := destructElement.next;
+		destructElement.destruct();
+		destructElement := nextElement;
+	END_WHILE
+	THIS^.last.next := NULL;
+ELSE
+	THIS^.announceListChange();
+END_IF
+
+IF THIS^.isObjectValid(iterator) THEN
+	iterator.destruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="className" Id="{6dd711de-b1ea-4743-a6fe-9d724e50f797}" FolderPath="IObject\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This abstract property returns the class name of the concrete object, 
+which is useful to check the class name for ``__DELETE``.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+PROPERTY className : CNM_AbstractObject.ClassName
+]]></Declaration>
+      <Get Name="Get" Id="{2ae70f89-8fe5-48ce-b3bb-2b3e1c5a62d8}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[className := 'CNM_Collections.LinkedList';
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="clear" Id="{3b1d4bb3-911f-4ca5-b821-2744c2df6094}" FolderPath="IList\ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method clears all elements from this list. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD clear
+VAR
+	currentElement	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	elementToDelete	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED 	:__XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[currentElement := THIS^.head;
+WHILE (THIS^.isObjectValid(currentElement)) DO
+	elementToDelete := currentElement;
+	currentElement := currentElement.next;
+	elementToDelete.destruct();
+END_WHILE
+
+THIS^.head := IS_NOT_REFERENCED;
+THIS^.last := IS_NOT_REFERENCED;
+THIS^.collectionSize := 0;
+THIS^.announceListChange();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clearContents" Id="{0fad7fe8-b223-4731-b6ce-131e5cf29ad6}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is called in the destruct method and is intended to zero all references and interfaces that should not be destructed. 
+To delete the collection with all its contents, use deepDestruct() instead of destruct().
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD PROTECTED clearContents
+VAR CONSTANT
+	NULL	: __XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.clear();
+THIS^.injectedSorter := 0;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clone" Id="{6eba6028-7ee2-4eee-a543-0cf9cddfe86d}" FolderPath="IObject\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are not cloned for this there is the method `ICloneable.deepClone`.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+**Attention:** 
+	For derivations: **If a derived class needs ``clone`` this method must be overwritten.**
+	and don't forget the attribute ``{attribute 'enable_dynamic_creation'}``  
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support cloning
+
+*)
+METHOD clone : CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject		:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	miniMe				:POINTER TO LinkedList;
+	iterator			:CNM_CollectionInterfaces.IIterator;
+	objectToAppend		:CNM_AbstractObject.IObject;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[clone := CNM_ReturnTypes.CloneResult.FAILED;
+miniMe := __NEW(LinkedList());
+RETURN (miniMe = 0);
+clone := CNM_ReturnTypes.CloneResult.SUCCESS;
+clonedObject := miniMe^;
+IF (THIS^.size > 0) THEN
+	IF (THIS^.createNewIterator(iterator => iterator) = CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+		iterator.iterate(FALSE);
+		WHILE (iterator.iterate(TRUE, object => objectToAppend) <> CNM_ReturnTypes.SingleExecutionState.SUCCESS) DO
+			IF THIS^.isObjectValid(objectToAppend) THEN
+				miniMe^.append(objectToAppend);
+			ELSE
+				iterator.destruct();
+				clone := CNM_ReturnTypes.CloneResult.FAILED;
+				miniMe^.deepDestruct();
+				clonedObject := 0;
+				RETURN;
+			END_IF
+		END_WHILE
+		iterator.destruct();
+	END_IF
+END_IF
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="compareTo" Id="{1e93732d-6003-4262-b159-623a2dfb2e0c}" FolderPath="IObject\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method compares a foreign object with the own one, this is needed for sort orders.
+The abstract class evaluates every object that is NULL as greater, and all other objects as equal. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SMALLER``: ``THIS`` precedes in order,
+	``EQUAL``: ``THIS`` and ``object`` at the same position in order,
+	``GREATER``: ``THIS`` is after in order.
+	Checkout :``CNM_CollectionInterfaces.ComparationResult``.
+
+*)
+METHOD compareTo :CNM_ReturnTypes.ComparationResult
+VAR_INPUT
+	(*the object to be compared to*)
+	object	:CNM_CollectionInterfaces.CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	collection :CNM_CollectionInterfaces.ICollection;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (THIS^.isObjectNull(object)) THEN
+	compareTo := CNM_ReturnTypes.ComparationResult.GREATER;
+ELSE
+	compareTo := CNM_ReturnTypes.ComparationResult.EQUAL;
+	IF(__QUERYINTERFACE(object, collection)) THEN
+		IF(collection.size < THIS^.size) THEN
+			compareTo := CNM_ReturnTypes.ComparationResult.GREATER;
+		ELSIF(collection.size > THIS^.size) THEN
+			compareTo := CNM_ReturnTypes.ComparationResult.SMALLER;			
+		END_IF
+	END_IF
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="createNewIterator" Id="{fa0afe18-4484-4bc4-ac11-1e441a1da0d1}" FolderPath="IList\ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns a NEW Iterator instance which can iterate the collection.
+These iterators can be used parallel independend of each other on the same collection.
+
+**Warning:**
+The returned Iterator was created using the __NEW operator and must be destructed to avoid memory leaks!
+
+
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2024 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD createNewIterator :CNM_CollectionInterfaces.CNM_ReturnTypes.SingleExecutionResult
+VAR_OUTPUT
+	(*The new created iterator or null if allocation fails *)
+	iterator	:CNM_CollectionInterfaces.IIterator;
+END_VAR
+VAR
+	newIterator :POINTER TO ForwardLinkedListIterator;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[newIterator := __NEW(ForwardLinkedListIterator(list := THIS^));
+IF (newIterator = 0) THEN
+	createNewIterator := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+	RETURN;
+END_IF
+createNewIterator := CNM_ReturnTypes.SingleExecutionResult.SUCCESS;
+iterator := newIterator^;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="decrementSize" Id="{7a337682-6320-4e2b-968d-89b1aa944c0e}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Reduces the collectionsize by one
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED decrementSize
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.collectionSize := THIS^.collectionSize-1;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="deepClone" Id="{1f1d90f9-e6e6-4625-b4e5-c22fda2b2665}" FolderPath="IObject\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method is used to create a new instance
+of the object which has the same internal state as the object.
+If the object is a container class, the references to the content objects
+are cloned too.
+
+If an object does not support cloning the return value is
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``.
+
+If there is not enough memory or the cloning fails because the
+attribute enable dynamic creation was forgotten the return value is 
+``CNM_ReturnTypes.CloneResult.FAILED``.
+If something goes wrong, then this method must clean up everything
+that has been cloned and free the memory again.
+**The deepClone either works completely, or not at all**
+
+Only if the return value is ``CNM_ReturnTypes.CloneResult.SUCCESS``
+the output ``clonedObject`` points to the new object
+otherwise ``clonedObject`` is NULL.  
+
+**Attention:** 
+	For derivations: **If a derived class needs ``deepClone`` this method must be overwritten.**
+	and don't forget the attribute ``{attribute 'enable_dynamic_creation'}``, even for container content 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:**``CNM_ReturnTypes.CloneResult.SUCCESS``: new object clone was created,
+``CNM_ReturnTypes.CloneResult.FAILED``: object clone failed
+``CNM_ReturnTypes.CloneResult.CLONE_IS_NOT_SUPPORTED``: object does not support deep cloning
+
+*)
+METHOD deepClone : CNM_AbstractObject.CNM_ReturnTypes.CloneResult
+VAR_OUTPUT
+	(* new object instance or NULL if somthing went wrong *)
+	clonedObject		:CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	miniMe				:POINTER TO LinkedList;
+	iterator			:CNM_CollectionInterfaces.IIterator;
+	objectToClone		:CNM_AbstractObject.IObject;
+	clonedObj			:CNM_AbstractObject.IObject;
+	clonedSorterObject	:CNM_AbstractObject.IObject;
+	clonedSorter		:CNM_CollectionInterfaces.ILinkedListSorter;
+	tmpResult 			:CNM_ReturnTypes.CloneResult;
+	allObjectsValid		:BOOL	:= TRUE;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[deepClone := CNM_ReturnTypes.CloneResult.FAILED;
+miniMe := __NEW(LinkedList());
+RETURN (miniMe = 0);
+deepClone := CNM_ReturnTypes.CloneResult.SUCCESS;
+clonedObject := miniMe^;
+IF (THIS^.size > 0) THEN
+	IF (THIS^.createNewIterator(iterator => iterator) = CNM_ReturnTypes.SingleExecutionResult.SUCCESS) THEN
+		iterator.iterate(FALSE);
+		WHILE (iterator.iterate(TRUE, object => objectToClone) = CNM_ReturnTypes.SingleExecutionState.BUSY) DO
+			allObjectsValid := allObjectsValid AND THIS^.isObjectValid(objectToClone);
+		END_WHILE
+		IF allObjectsValid THEN
+			iterator.iterate(FALSE);
+			WHILE (iterator.iterate(TRUE, object => objectToClone) <> CNM_ReturnTypes.SingleExecutionState.SUCCESS) DO
+				IF THIS^.isObjectValid(objectToClone) THEN
+					tmpResult := objectToClone.deepClone(clonedObject => clonedObj); 
+					IF ( tmpResult = CNM_ReturnTypes.CloneResult.SUCCESS) THEN
+						miniMe^.append(clonedObj);
+					ELSE
+						iterator.destruct();
+						deepClone := tmpResult;
+						miniMe^.deepDestruct();
+						clonedObject := 0;
+						RETURN;
+					END_IF
+				END_IF
+			END_WHILE
+		ELSE
+			deepClone := CNM_ReturnTypes.CloneResult.FAILED;
+			miniMe^.deepDestruct();
+			clonedObject := 0;
+			RETURN;
+		END_IF
+		iterator.destruct();
+	END_IF
+END_IF
+
+RETURN (THIS^.isObjectNull(THIS^.injectedSorter));
+tmpResult := THIS^.injectedSorter.deepClone(clonedObject => clonedSorterObject);
+IF ((tmpResult <> CNM_ReturnTypes.CloneResult.SUCCESS) 
+		OR_ELSE 
+	THIS^.isObjectNull(clonedSorterObject) 
+		OR_ELSE 
+	(NOT __QUERYINTERFACE(clonedSorterObject, clonedSorter))
+) THEN
+	deepClone := SEL((tmpResult = CNM_ReturnTypes.CloneResult.SUCCESS), tmpResult, CNM_ReturnTypes.CloneResult.FAILED);
+	miniMe^.deepDestruct();
+	clonedObject := 0;
+	RETURN;
+END_IF
+
+miniMe^.setSorter(sorter := clonedSorter);
+deepClone := CNM_ReturnTypes.CloneResult.SUCCESS;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="dequeue" Id="{95fbb36d-0875-416c-92ad-b3c4d2cf4775}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns the last object in the first and removes it from the list. Can be seen as opposite of prepend.
+**Example:**
+On a list: (Head -->) A B C, list.dequeue will return A.
+**Example 2:**
+If you call prepend(x), a dequeue right after will return x.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD dequeue :CNM_AbstractObject.IObject
+VAR_INPUT
+END_VAR
+VAR
+	oldHead		:CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED 	:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[dequeue := IS_NOT_REFERENCED;
+IF (THIS^.isObjectValid(THIS^.head)) THEN
+	dequeue		:= THIS^.head.object;
+	oldHead		:= THIS^.head;
+	THIS^.head	:= oldHead.next;	
+	oldHead.destruct();
+	IF (THIS^.isObjectNull(THIS^.head)) THEN
+		THIS^.last := IS_NOT_REFERENCED;
+	END_IF;
+	THIS^.decrementSize();
+	THIS^.announceListChange();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="destructLinkedElement" Id="{703924d3-2a80-44be-89ce-b9910f4c7b0c}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Destructs the passed element. Next and Previous Element are relinked to prevent gaps. Also takes care that head / last are updated if necessary
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD PROTECTED destructLinkedElement
+VAR_INPUT
+	(*The element that should be destructed*)
+	element :CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF(THIS^.isObjectNull(element))THEN
+	RETURN;
+END_IF
+IF (THIS^.isObjectValid(THIS^.head) AND_THEN THIS^.head.isEqual(element)) THEN
+	THIS^.head := THIS^.head.next;
+END_IF
+IF (THIS^.isObjectValid(THIS^.lastElement) AND_THEN THIS^.last.isEqual(element)) THEN
+	THIS^.lastElement := THIS^.lastElement.previous;
+END_IF
+IF (THIS^.isObjectValid(element.previous)) THEN
+	element.previous.next := element.next;
+END_IF
+IF THIS^.isObjectValid(element.next) THEN
+	 element.next.previous := element.previous;
+END_IF
+element.destruct();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Exit" Id="{e9378d20-8288-41ef-b8c6-584aa23e1659}">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Mark the object as deleted, as it staiys in the memory.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+METHOD FB_Exit : BOOL
+VAR_INPUT
+	(* TRUE: the exit method is called in order to leave the instance which will be copied afterwards (online change).*)
+	bInCopyCode	: BOOL;
+END_VAR
+VAR
+	currentElement 	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	next 			:CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[currentElement := THIS^.head;
+WHILE (THIS^.isObjectValid(currentElement)) DO
+	next := currentElement.next;
+	currentElement.deepDestruct();
+	currentElement := next;
+END_WHILE
+IF THIS^.isObjectValid(THIS^.injectedSorter) THEN
+	THIS^.injectedSorter.deepDestruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="findObject" Id="{12931575-54bf-428d-bb27-c0b0c7964c24}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Searches the containerobject, that contains a specific Element that is passed to the method.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** The (first) IDoublyLinkedElement that contains the ``object``, NULL if ``object`` is not contained in the list
+
+*)
+
+METHOD PROTECTED findObject :CNM_CollectionInterfaces.IDoublyLinkedElement
+VAR_INPUT
+	(*The object to search for*)
+	object :CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	element	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED 	:__XWORD := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF(THIS^.isObjectNull(object))THEN
+	findObject := IS_NOT_REFERENCED;
+	RETURN;
+END_IF
+element := THIS^.head;
+WHILE (THIS^.isObjectValid(element) AND_THEN NOT element.object.isEqual(object)) DO
+	element := element.next;
+END_WHILE
+findObject := element;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="head" Id="{3e8fbe20-242e-496a-8ab0-bd4e8334fe1c}" FolderPath="Internal\">
+      <Declaration><![CDATA[PROPERTY INTERNAL head : CNM_CollectionInterfaces.IDoublyLinkedElement]]></Declaration>
+      <Get Name="Get" Id="{69a39367-55b9-418c-b9f0-84f3aaaa891e}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[head := THIS^.headElement;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{90aabc26-2ff4-4f94-be5c-03d1eb9a92c9}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.headElement := head;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="incrementSize" Id="{ee76a077-495e-4468-a241-30e94d498094}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Increments the size of the list
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD PROTECTED incrementSize
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.collectionSize := THIS^.collectionSize+1;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="instantSorting" Id="{044f04b2-2fcc-48bb-96a6-b01babd42891}" FolderPath="Internal\">
+      <Declaration><![CDATA[METHOD INTERNAL instantSorting : CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	order :SortingOrder;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE order OF
+SortingOrder.ASCENDING:
+	instantSorting := THIS^.sorter.instantSort(
+		size := THIS^.size,
+		comparator := comparator,
+		head := THIS^.headElement,
+		last := THIS^.lastElement,
+		currentListVersion := THIS^.changesToCollection
+	);
+SortingOrder.DESCENDING:
+	instantSorting := THIS^.sorter.instantInverseSort(
+		size := THIS^.size,
+		comparator := comparator,
+		head := THIS^.headElement,
+		last := THIS^.lastElement,
+		currentListVersion := THIS^.changesToCollection
+	);
+END_CASE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="invert" Id="{8a0496aa-51a5-42fc-a7cb-16f1d01173d8}" FolderPath="IInvertable\">
+      <Declaration><![CDATA[
+(*
+
+## Short summary
+
+Inverts the List, so last element becomes first.
+So List A B C D will be
+D C B A
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+
+METHOD invert
+VAR
+	leftElement 	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	rightElement	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	tmpElement 		:CNM_AbstractObject.IObject;
+	index 			:UDINT;
+	middle 			:UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[RETURN(THIS^.size < 2);
+leftElement := THIS^.head;
+rightElement := THIS^.last;
+
+middle := SHR(THIS^.size,1);
+FOR index := 1 TO middle DO
+	tmpElement := leftElement.object;
+	leftElement.object := rightElement.object;
+	rightElement.object := tmpElement;
+	leftElement := leftElement.next;
+	rightElement := rightElement.previous;
+END_FOR
+
+THIS^.announceListChange();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="iterate" Id="{b0b67cd0-9f71-49a5-b917-33375522f371}" FolderPath="IList\ICollection\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method returns the next object in the iteration and returns an execution state.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``SUCCESS``: if last object from collection was returned,
+	``ABORTED``: execute has a falling edge during iterate,
+	``BUSY``: When iterate had rising edge on execute and not all objects had been returned yet
+	``IDLE``: iterate not in progress, execute is false and iterate reseted 
+
+*)
+METHOD PROTECTED iterate :CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	(*False to init, True to retrieve next element*)
+	execute	: BOOL;
+END_VAR
+VAR_OUTPUT
+	(*The current element of the iteration*)
+	object	:CNM_AbstractObject.IObject;
+END_VAR
+VAR_INST
+	currentElement		:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	cycleManager		:CNM_CycleManager.SimpleCycleManager;
+	currentListVersion 	:__XWORD;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED 	:__XWORD := 0;
+	INIT 		:DINT := CNM_ReturnTypes.DefaultSteps.STEP.INIT;
+	ITERATING 	:DINT := INIT +1;
+	ERROR		:DINT := CNM_ReturnTypes.DefaultSteps.STEP.ERROR;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (cycleManager.step.current > INIT) THEN
+	cycleManager.assert.bitNumber.x.valueIsEqualTo(
+		currentValue := currentListVersion,
+		expectedValue := THIS^.changesToCollection,
+		message := 'This instance of LinkedList has changed between iterate calls'
+	);
+END_IF
+
+cycleManager(execute := execute);
+CASE cycleManager.step.current OF
+INIT:
+	currentElement := THIS^.head;	
+	currentListVersion := THIS^.changesToCollection;
+	IF (THIS^.isObjectValid(currentElement)) THEN
+		object := currentElement.object;
+		currentElement := currentElement.next;
+		cycleManager.proceed();
+	ELSE
+		cycleManager.proceedWith(CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS);
+	END_IF			
+ITERATING:
+	IF (THIS^.isObjectValid(currentElement)) THEN
+		object := currentElement.object;
+		currentElement := currentElement.next;
+	ELSE
+		cycleManager.proceedWith(CNM_ReturnTypes.DefaultSteps.STEP.SUCCESS);
+	END_IF
+ERROR:
+	object := IS_NOT_REFERENCED; 
+END_CASE
+
+iterate := cycleManager.state;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="last" Id="{5332e6fb-5cf8-484b-a7a5-e4b94c527271}" FolderPath="Internal\">
+      <Declaration><![CDATA[PROPERTY INTERNAL last : CNM_CollectionInterfaces.IDoublyLinkedElement
+]]></Declaration>
+      <Get Name="Get" Id="{6ca6f19f-5218-4220-b506-b9416688ec81}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[last := THIS^.lastElement;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{486daa38-232d-49d8-b631-151592e6ef06}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.lastElement := last;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="linkElement" Id="{ae1a2cd1-ec75-4b06-b521-31cc0de4bd07}" FolderPath="Protected\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+Links the passed element together with the other two passed element
+Does not only adds the links to element, but also sets next.previous to element and previous.next to element,
+to ensure a consistent list
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2023 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD PROTECTED linkElement
+VAR_INPUT
+	(*the element that should be set as previous element*)
+	previous		:CNM_CollectionInterfaces.IDoublyLinkedElement	:= IS_NOT_REFERENCED;
+	(*The element that should be new linked*)
+	element		:CNM_CollectionInterfaces.IDoublyLinkedElement	:= IS_NOT_REFERENCED;
+	(*The element that should be used as next element*)
+	next			:CNM_CollectionInterfaces.IDoublyLinkedElement	:= IS_NOT_REFERENCED;	
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED	:__UXINT := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (THIS^.isObjectNull(element)) THEN
+	RETURN;
+END_IF
+
+element.previous	:= previous;
+element.next			:= next;
+
+IF (THIS^.isObjectValid(previous)) THEN
+	previous.next := element;
+END_IF
+IF (THIS^.isObjectValid(next)) THEN
+	next.previous := element;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="listChangeIndex" Id="{85ba8af0-8b59-4180-860b-f78adb11a3f2}">
+      <Declaration><![CDATA[PROPERTY INTERNAL listChangeIndex : __XWORD]]></Declaration>
+      <Get Name="Get" Id="{2b0918ee-f47a-4b82-9148-00a8af28ec8b}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[listChangeIndex := THIS^.changesToCollection;
+]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{c3ccaf7c-cbed-4087-8f60-6e24fc4777c7}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[THIS^.changesToCollection := listChangeIndex;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="pop" Id="{feb3aa89-d055-4752-96b3-c8288ad587a8}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This property returns the last object in the list and removes it from the list. Can be seen as opposite of append.
+**Example:**
+On a list: (Head -->) A B C, list.pop will return C.
+**Example 2:**
+If you call append(x), a pop right after will return x.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+*)
+
+METHOD pop :CNM_AbstractObject.IObject
+VAR_INPUT
+END_VAR
+VAR
+	oldLast		:CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED 	:__XWORD := 0;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pop := IS_NOT_REFERENCED;
+
+IF (THIS^.isObjectValid(THIS^.last)) THEN
+	pop 		:= THIS^.last.object;
+	oldLast		:= THIS^.lastElement;
+	THIS^.last	:= THIS^.last.previous;
+	oldLast.destruct();
+	IF (THIS^.isObjectNull(THIS^.last)) THEN
+		THIS^.head := IS_NOT_REFERENCED;
+	ELSE
+		THIS^.last.next := IS_NOT_REFERENCED;
+	END_IF;	
+	THIS^.decrementSize();
+	THIS^.announceListChange();
+END_IF
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="prepend" Id="{b5dc7b90-292b-41b9-ad47-d5c5ef9ab6a9}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds the given object as new head to the list.
+Adding NULL-Objects or THIS^ to the list is not possible. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: new Container not needed / could be allocated and data was copied
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: new Container couldn't be allocated, container left unchanged
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or the list itself was passed
+*)
+METHOD prepend :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The object to be prepended*)
+	object	: CNM_CollectionInterfaces.CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	result :CNM_ReturnTypes.SingleExecutionResult;
+	newElement 	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED : __XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[prepend := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN (THIS^.isObjectNull(object) OR THIS^.isEqual(object));	
+RETURN( 
+	(prepend := THIS^.collectionFactory.getNewDoublyLinkedElement(
+		object				:= object,
+		previousElement		:= IS_NOT_REFERENCED,
+		nextElement			:= THIS^.headElement,
+		linkElements		:= TRUE,
+		element 			=> newElement)
+	) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS 
+);
+THIS^.head := newElement;
+IF(THIS^.isObjectNull(THIS^.last))THEN
+	THIS^.last := THIS^.head;
+END_IF
+THIS^.incrementSize();
+THIS^.announceListChange();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="prependCollection" Id="{5186cd85-72f6-4f61-9089-694cf0f9eef9}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method adds all elements of the given collection to the start of this list. 
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2025 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``CNM_ReturnTypes.SingleExecutionResult.SUCCESS``: prepend was successful
+	``CNM_ReturnTypes.SingleExecutionResult.ERROR``: collection to prepend didn't fit in old container, and new container couldn't be allocated
+	``CNM_ReturnTypes.SingleExecutionResult.ABORTED``: NULL object or this arraylist was passed
+	
+
+*)
+METHOD prependCollection :CNM_ReturnTypes.SingleExecutionResult
+VAR_INPUT
+	(*The collection to be prepended*)
+	collectionToPrepend		:CNM_CollectionInterfaces.ICollection;
+END_VAR
+VAR
+	collectionElement 		:CNM_AbstractObject.IObject;
+	oldHead 				:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	current 				:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	old 					:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	newElement 				:CNM_CollectionInterfaces.IDoublyLinkedElement;
+	iterator				:CNM_CollectionInterfaces.IIterator;
+	result					:CNM_ReturnTypes.SingleExecutionResult;
+	iterateState			:CNM_ReturnTypes.SingleExecutionState;
+END_VAR
+VAR CONSTANT
+	IS_NOT_REFERENCED 		:__XWORD := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[prependCollection := CNM_ReturnTypes.SingleExecutionResult.ABORTED;
+RETURN(THIS^.isObjectNull(collectionToPrepend) OR_ELSE THIS^.isEqual(collectionToPrepend));
+
+RETURN((prependCollection := collectionToPrepend.createNewIterator(iterator => iterator)) <> CNM_ReturnTypes.SingleExecutionResult.SUCCESS);
+
+iterateState := iterator.iterate(FALSE);
+
+oldHead := THIS^.headElement;
+iterateState := iterator.iterate(TRUE, object => collectionElement);
+result := THIS^.collectionFactory.getNewDoublyLinkedElement(
+	object				:= collectionElement,
+	previousElement		:= IS_NOT_REFERENCED,
+	nextElement			:= IS_NOT_REFERENCED,
+	linkElements		:= TRUE,
+	element				=> newElement
+);
+
+THIS^.head := newElement;
+current := newElement;
+IF THIS^.isObjectNull(current) THEN
+	prependCollection := CNM_ReturnTypes.SingleExecutionResult.ERROR;
+END_IF
+
+iterateState := iterator.iterate(TRUE, object => collectionElement);
+WHILE((
+		THIS^.isObjectValid(collectionElement) 
+	) AND ( 
+		prependCollection = CNM_ReturnTypes.SingleExecutionResult.SUCCESS
+	) AND (
+		iterateState = CNM_ReturnTypes.SingleExecutionState.BUSY
+	)
+)DO
+	result := THIS^.collectionFactory.getNewDoublyLinkedElement(
+		object				:= collectionElement,
+		previousElement		:= current,
+		nextElement			:= IS_NOT_REFERENCED,
+		linkElements		:= TRUE,
+		element				=> newElement				
+	);
+	current := newElement;
+	iterateState := iterator.iterate(TRUE, object => collectionElement);
+END_WHILE
+
+//in case of failed reset to old state
+IF (prependCollection = CNM_ReturnTypes.SingleExecutionResult.ERROR) THEN
+	WHILE THIS^.isObjectValid(current) DO
+		old := current;
+		current := current.previous;
+		old.destruct();
+	END_WHILE
+	THIS^.head := oldHead;
+	RETURN; 
+END_IF
+
+current.next := oldHead;
+IF(THIS^.isObjectValid(oldHead))THEN
+	oldHead.previous := current;	
+ELSE
+	THIS^.last := current;
+END_IF
+
+THIS^.collectionSize := (THIS^.collectionSize + collectionToPrepend.size);
+THIS^.announceListChange();
+IF THIS^.isObjectValid(iterator) THEN
+	iterator.destruct();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="remove" Id="{4d84140c-8247-4720-ab9f-6b9420116abf}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method removes the first occurrence of the given object from the list.
+
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+
+*)
+METHOD remove
+VAR_INPUT
+	(*The object to be removed from the list*)
+	object	: CNM_CollectionInterfaces.CNM_AbstractObject.IObject;
+END_VAR
+VAR
+	element	:CNM_CollectionInterfaces.IDoublyLinkedElement;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[element := THIS^.findObject(object);
+RETURN(THIS^.isObjectNull(element));
+THIS^.destructLinkedElement(element);
+THIS^.decrementSize();
+THIS^.announceListChange();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="setSorter" Id="{496309b6-6afb-4368-b628-19ac1d717fe8}" FolderPath="IList\">
+      <Declaration><![CDATA[(*
+
+## Short summary
+
+This method can replace the default sorter for a custom one. Check ``IListSorter``
+	
+.. warning
+	If the injected sorter was created dynamically,
+	it will be automatically destruced within the deepdestruct context of THIS list.
+	
+.. <legal notes>
+
+legal notes
+=================
+| SPDX-FileCopyrightText: © 2022 ekvip automation GmbH <info@ekvip.de>
+| SPDX-License-Identifier: Apache-2.0
+| For details check: Apache-2.0_
+
+.. _Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+.. </legal notes>
+
+
+**Return:** ``THIS`` :``ISortable``
+
+*)
+METHOD setSorter : CNM_CollectionInterfaces.ISortable
+VAR_INPUT
+	(*The instance of the sorter to be used to sort the list*)
+	sorter	: CNM_CollectionInterfaces.ILinkedListSorter;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.injectedSorter := sorter;
+setSorter := THIS^.sort;
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="sorter" Id="{10f9aa4a-f49d-44aa-a5f0-f10989a0aa66}">
+      <Declaration><![CDATA[PROPERTY PROTECTED sorter :CNM_CollectionInterfaces.ILinkedListSorter]]></Declaration>
+      <Get Name="Get" Id="{722acc7c-cab2-4087-83e1-d0fa80dcc706}">
+        <Declaration><![CDATA[VAR_INST
+	instSorter :LinkedListMergeSorter;
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF(THIS^.isObjectValid(THIS^.injectedSorter))THEN
+	sorter := THIS^.injectedSorter;
+ELSE
+	sorter := instSorter;
+END_IF
+
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="sorting" Id="{63673219-9d59-4cb9-b6ef-2d758bc18cfd}" FolderPath="Internal\">
+      <Declaration><![CDATA[METHOD INTERNAL sorting : CNM_ReturnTypes.SingleExecutionState
+VAR_INPUT
+	execute :BOOL;
+	order :SortingOrder;
+	(*Optional: the comparator that should be used for the sort. Must not be changed while sort is in process*)
+	comparator	: CNM_CollectionInterfaces.CNM_AbstractObject.IComparator := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE order OF
+SortingOrder.ASCENDING:
+	sorting := THIS^.sorter.sort(
+		execute := execute,
+		size := THIS^.size,
+		comparator := comparator,
+		head := THIS^.headElement,
+		last := THIS^.lastElement,
+		currentListVersion := THIS^.changesToCollection
+	);
+	
+SortingOrder.DESCENDING:
+	sorting := THIS^.sorter.inverseSort(
+		execute := execute,
+		size := THIS^.size,
+		comparator := comparator,
+		head := THIS^.headElement,
+		last := THIS^.lastElement,
+		currentListVersion := THIS^.changesToCollection
+	);
+END_CASE
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="LinkedList">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.announceListChange">
+      <LineId Id="61" Count="0" />
+      <LineId Id="64" Count="0" />
+      <LineId Id="34" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.append">
+      <LineId Id="133" Count="0" />
+      <LineId Id="50" Count="2" />
+      <LineId Id="173" Count="0" />
+      <LineId Id="53" Count="3" />
+      <LineId Id="171" Count="1" />
+      <LineId Id="174" Count="0" />
+      <LineId Id="57" Count="1" />
+      <LineId Id="40" Count="1" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="97" Count="0" />
+      <LineId Id="96" Count="0" />
+      <LineId Id="98" Count="0" />
+      <LineId Id="170" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.appendCollection">
+      <LineId Id="184" Count="0" />
+      <LineId Id="136" Count="0" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="168" Count="0" />
+      <LineId Id="171" Count="0" />
+      <LineId Id="140" Count="0" />
+      <LineId Id="142" Count="1" />
+      <LineId Id="149" Count="0" />
+      <LineId Id="154" Count="0" />
+      <LineId Id="151" Count="0" />
+      <LineId Id="178" Count="1" />
+      <LineId Id="153" Count="0" />
+      <LineId Id="152" Count="0" />
+      <LineId Id="144" Count="2" />
+      <LineId Id="156" Count="0" />
+      <LineId Id="155" Count="0" />
+      <LineId Id="157" Count="0" />
+      <LineId Id="159" Count="0" />
+      <LineId Id="161" Count="1" />
+      <LineId Id="165" Count="1" />
+      <LineId Id="163" Count="0" />
+      <LineId Id="180" Count="1" />
+      <LineId Id="40" Count="0" />
+      <LineId Id="182" Count="1" />
+      <LineId Id="175" Count="2" />
+      <LineId Id="167" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.className.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="LinkedList.clear">
+      <LineId Id="111" Count="1" />
+      <LineId Id="153" Count="0" />
+      <LineId Id="114" Count="0" />
+      <LineId Id="154" Count="0" />
+      <LineId Id="119" Count="4" />
+      <LineId Id="52" Count="0" />
+      <LineId Id="156" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.clearContents">
+      <LineId Id="1" Count="2" />
+    </LineIds>
+    <LineIds Name="LinkedList.clone">
+      <LineId Id="26" Count="22" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.compareTo">
+      <LineId Id="75" Count="4" />
+      <LineId Id="83" Count="0" />
+      <LineId Id="87" Count="1" />
+      <LineId Id="90" Count="0" />
+      <LineId Id="86" Count="0" />
+      <LineId Id="84" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="91" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.createNewIterator">
+      <LineId Id="1" Count="0" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="11" Count="1" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="4" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="7" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.decrementSize">
+      <LineId Id="5" Count="1" />
+    </LineIds>
+    <LineIds Name="LinkedList.deepClone">
+      <LineId Id="44" Count="7" />
+      <LineId Id="101" Count="3" />
+      <LineId Id="106" Count="0" />
+      <LineId Id="52" Count="1" />
+      <LineId Id="85" Count="0" />
+      <LineId Id="54" Count="9" />
+      <LineId Id="112" Count="1" />
+      <LineId Id="110" Count="1" />
+      <LineId Id="108" Count="0" />
+      <LineId Id="114" Count="0" />
+      <LineId Id="105" Count="0" />
+      <LineId Id="65" Count="5" />
+      <LineId Id="88" Count="0" />
+      <LineId Id="95" Count="4" />
+      <LineId Id="89" Count="3" />
+      <LineId Id="87" Count="0" />
+      <LineId Id="93" Count="0" />
+      <LineId Id="84" Count="0" />
+      <LineId Id="2" Count="0" />
+      <LineId Id="100" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.dequeue">
+      <LineId Id="30" Count="4" />
+      <LineId Id="54" Count="0" />
+      <LineId Id="40" Count="2" />
+      <LineId Id="44" Count="0" />
+      <LineId Id="55" Count="0" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="29" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.destructLinkedElement">
+      <LineId Id="21" Count="1" />
+      <LineId Id="19" Count="0" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="13" Count="3" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="39" Count="5" />
+      <LineId Id="47" Count="1" />
+    </LineIds>
+    <LineIds Name="LinkedList.FB_Exit">
+      <LineId Id="1" Count="9" />
+    </LineIds>
+    <LineIds Name="LinkedList.findObject">
+      <LineId Id="25" Count="0" />
+      <LineId Id="31" Count="0" />
+      <LineId Id="34" Count="0" />
+      <LineId Id="32" Count="0" />
+      <LineId Id="15" Count="2" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="18" Count="0" />
+      <LineId Id="20" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.head.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="LinkedList.head.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="LinkedList.incrementSize">
+      <LineId Id="6" Count="0" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.instantSorting">
+      <LineId Id="1" Count="18" />
+    </LineIds>
+    <LineIds Name="LinkedList.invert">
+      <LineId Id="142" Count="0" />
+      <LineId Id="53" Count="0" />
+      <LineId Id="133" Count="0" />
+      <LineId Id="135" Count="0" />
+      <LineId Id="132" Count="0" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="136" Count="0" />
+      <LineId Id="138" Count="3" />
+      <LineId Id="50" Count="0" />
+      <LineId Id="131" Count="0" />
+      <LineId Id="93" Count="0" />
+      <LineId Id="58" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.iterate">
+      <LineId Id="269" Count="0" />
+      <LineId Id="273" Count="3" />
+      <LineId Id="271" Count="1" />
+      <LineId Id="270" Count="0" />
+      <LineId Id="233" Count="0" />
+      <LineId Id="238" Count="1" />
+      <LineId Id="243" Count="0" />
+      <LineId Id="242" Count="0" />
+      <LineId Id="280" Count="2" />
+      <LineId Id="285" Count="0" />
+      <LineId Id="283" Count="1" />
+      <LineId Id="279" Count="0" />
+      <LineId Id="246" Count="0" />
+      <LineId Id="262" Count="2" />
+      <LineId Id="257" Count="2" />
+      <LineId Id="277" Count="1" />
+      <LineId Id="260" Count="0" />
+      <LineId Id="232" Count="0" />
+      <LineId Id="178" Count="0" />
+      <LineId Id="78" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.last.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.last.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="LinkedList.linkElement">
+      <LineId Id="10" Count="2" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="22" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="15" Count="3" />
+      <LineId Id="35" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="36" Count="0" />
+      <LineId Id="26" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.listChangeIndex.Get">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="LinkedList.listChangeIndex.Set">
+      <LineId Id="1" Count="1" />
+    </LineIds>
+    <LineIds Name="LinkedList.pop">
+      <LineId Id="30" Count="3" />
+      <LineId Id="54" Count="0" />
+      <LineId Id="35" Count="0" />
+      <LineId Id="47" Count="0" />
+      <LineId Id="57" Count="3" />
+      <LineId Id="56" Count="0" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="61" Count="0" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="29" Count="0" />
+      <LineId Id="55" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.prepend">
+      <LineId Id="130" Count="0" />
+      <LineId Id="41" Count="0" />
+      <LineId Id="170" Count="7" />
+      <LineId Id="169" Count="0" />
+      <LineId Id="56" Count="0" />
+      <LineId Id="58" Count="1" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="93" Count="0" />
+      <LineId Id="95" Count="0" />
+      <LineId Id="167" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.prependCollection">
+      <LineId Id="253" Count="0" />
+      <LineId Id="256" Count="1" />
+      <LineId Id="314" Count="0" />
+      <LineId Id="311" Count="0" />
+      <LineId Id="258" Count="8" />
+      <LineId Id="323" Count="0" />
+      <LineId Id="267" Count="0" />
+      <LineId Id="316" Count="0" />
+      <LineId Id="268" Count="10" />
+      <LineId Id="324" Count="1" />
+      <LineId Id="279" Count="6" />
+      <LineId Id="322" Count="0" />
+      <LineId Id="286" Count="23" />
+      <LineId Id="156" Count="0" />
+      <LineId Id="317" Count="0" />
+      <LineId Id="320" Count="0" />
+      <LineId Id="319" Count="0" />
+      <LineId Id="321" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.remove">
+      <LineId Id="54" Count="0" />
+      <LineId Id="119" Count="0" />
+      <LineId Id="56" Count="0" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="88" Count="0" />
+      <LineId Id="122" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.setSorter">
+      <LineId Id="80" Count="1" />
+      <LineId Id="77" Count="0" />
+      <LineId Id="38" Count="0" />
+    </LineIds>
+    <LineIds Name="LinkedList.sorter.Get">
+      <LineId Id="1" Count="6" />
+    </LineIds>
+    <LineIds Name="LinkedList.sorting">
+      <LineId Id="1" Count="21" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

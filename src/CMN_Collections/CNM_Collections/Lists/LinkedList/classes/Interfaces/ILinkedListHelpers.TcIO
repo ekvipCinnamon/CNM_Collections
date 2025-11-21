@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.8">
+  <Itf Name="ILinkedListHelpers" Id="{4cb26080-4e48-4ae5-9a10-db47f231432a}">
+    <Declaration><![CDATA[INTERFACE INTERNAL ILinkedListHelpers EXTENDS IListHelpers, CNM_CollectionInterfaces.ILinkedList
+]]></Declaration>
+    <Property Name="head" Id="{17c5fc82-ae21-4681-a789-5378400bf66c}">
+      <Declaration><![CDATA[PROPERTY INTERNAL head : CNM_CollectionInterfaces.IDoublyLinkedElement]]></Declaration>
+      <Get Name="Get" Id="{490b0021-f836-49d7-84f7-d046dfec467b}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{b3008110-9004-4c62-a52c-e225ec263acd}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="last" Id="{e16a42bd-ed53-4d59-93f5-c0701c9cbdbc}">
+      <Declaration><![CDATA[PROPERTY INTERNAL last : CNM_CollectionInterfaces.IDoublyLinkedElement]]></Declaration>
+      <Get Name="Get" Id="{ec51f6e8-61b7-4847-840b-8fba98a5c2d3}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{11441952-40fd-4a6a-b63a-1e030beb6638}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+  </Itf>
+</TcPlcObject>
