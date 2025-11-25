@@ -1,0 +1,300 @@
+{
+	"$schema": "http://cyclonedx.org/schema/bom-1.7.schema.json",
+	"bomFormat": "CycloneDX",
+	"specVersion": "1.7",
+	"serialNumber": "urn:uuid:6aa339cb-9354-452a-bc3f-1b9686b4cf58",
+	"version": 1,
+	"metadata": {
+		"timestamp": "2025-11-25T13:36:01.188Z",
+		"lifecycles": [
+			{
+				"phase": "build"
+			}
+		],
+		"tools": {
+			"components": [
+				{
+					"type": "application",
+					"name": "TwinCAT XAE Shell",
+					"version": "4.7.4.0",
+					"description": "The main IDE shell environment",
+					"supplier": {
+						"name": "Beckhoff Automation GmbH & Co. KG"
+					}
+				},
+				{
+					"type": "application",
+					"name": "TwinCAT XAE Base (Build)",
+					"version": "3.1.4026.19",
+					"description": "Basic configuration components for the TwinCAT XAE",
+					"supplier": {
+						"name": "Beckhoff Automation GmbH & Co. KG"
+					},
+					"properties": [
+						{
+							"name": "ekvip:build-requirement",
+							"value": ">=3.1.4026.19"
+						}
+					],
+					"purl": "pkg:twincat/beckhoff/xae_base@3.1.4026.19"
+				}
+			]
+		},
+		"authors": [
+			{
+				"name": "ekvip automation GmbH"
+			}
+		],
+		"supplier": {
+			"name": "ekvip automation GmbH",
+			"url": [
+				"https://ekvip.de"
+			],
+			"contact": [
+				{
+					"email": "info@ekvip.de"
+				}
+			]
+		},
+		"component": {
+			"bom-ref": "CNM_Collections",
+			"type": "library",
+			"name": "cnm4026-abstract-object-lib",
+			"version": "1.0.0.0",
+			"description": "",
+			"licenses": [
+				{
+					"license": {
+						"id": "Apache-2.0"
+					}
+				}
+			],
+			"copyright": "© 2025 ekvip automation GmbH <info@ekvip.de>",
+			"externalReferences": [
+				{
+					"type": "vcs",
+					"url": "https://github.com/ekvipCinnamon/CNM_Collections",
+					"comment": "Source code repository"
+				},
+				{
+					"type": "documentation",
+					"url": "https://static.ekvip.de/docs/CNM_Collections/1.0.0.0",
+					"comment": "Library documentation"
+				},
+				{
+					"type": "license",
+					"url": "https://www.apache.org/licenses/LICENSE-2.0",
+					"comment": "Apache License 2.0"
+				}
+			],
+			"properties": [],
+			"tags": [
+				"twincat",
+				"twincat3",
+				"plc",
+				"iec-61131-3",
+				"industrial-automation",
+				"oop"
+			]
+		}
+	},
+	"components": [
+		{
+			"bom-ref": "CNM_AbstractObject",
+			"type": "library",
+			"name": "CNM_AbstractObject",
+			"version": "1.*",
+			"description": "",
+			"supplier": {
+				"name": "ekvip automation GmbH"
+			},
+			"licenses": [
+				{
+					"license": {
+						"id": "Apache-2.0"
+					}
+				}
+			],
+			"copyright": "© 2025 ekvip automation GmbH <info@ekvip.de>",
+			"scope": "required",
+			"externalReferences": [
+				{
+					"type": "vcs",
+					"url": "https://github.com/ekvipCinnamon/CNM_AbstractObject",
+					"comment": "Source code repository"
+				}
+			]
+		},
+		{
+			"bom-ref": "CNM_CollectionInterfaces",
+			"type": "library",
+			"name": "CNM_CollectionInterfaces",
+			"version": "0.1.*",
+			"description": "",
+			"supplier": {
+				"name": "ekvip automation GmbH"
+			},
+			"licenses": [
+				{
+					"license": {
+						"id": "Apache-2.0"
+					}
+				}
+			],
+			"copyright": "© 2025 ekvip automation GmbH <info@ekvip.de>",
+			"scope": "required",
+			"externalReferences": [
+				{
+					"type": "vcs",
+					"url": "https://github.com/ekvipCinnamon/CNM_CollectionInterfaces",
+					"comment": "Source code repository"
+				}
+			]
+		},
+		{
+			"bom-ref": "CNM_CommandInterfaces",
+			"type": "library",
+			"name": "CNM_CommandInterfaces",
+			"version": "0.1.*",
+			"description": "",
+			"supplier": {
+				"name": "ekvip automation GmbH"
+			},
+			"licenses": [
+				{
+					"license": {
+						"id": "Apache-2.0"
+					}
+				}
+			],
+			"copyright": "© 2025 ekvip automation GmbH <info@ekvip.de>",
+			"scope": "required",
+			"externalReferences": [
+				{
+					"type": "vcs",
+					"url": "https://github.com/ekvipCinnamon/CNM_CommandInterfaces",
+					"comment": "Source code repository"
+				}
+			]
+		},
+		{
+			"bom-ref": "CNM_CycleManager",
+			"type": "library",
+			"name": "CNM_CycleManager",
+			"version": "0.1.*",
+			"description": "",
+			"supplier": {
+				"name": "ekvip automation GmbH"
+			},
+			"licenses": [
+				{
+					"license": {
+						"id": "Apache-2.0"
+					}
+				}
+			],
+			"copyright": "© 2025 ekvip automation GmbH <info@ekvip.de>",
+			"scope": "required",
+			"externalReferences": [
+				{
+					"type": "vcs",
+					"url": "https://github.com/ekvipCinnamon/CNM_CycleManager",
+					"comment": "Source code repository"
+				}
+			]
+		},
+		{
+			"bom-ref": "CNM_CycleManagerInterfaces",
+			"type": "library",
+			"name": "CNM_CycleManagerInterfaces",
+			"version": "0.1.*",
+			"description": "",
+			"supplier": {
+				"name": "ekvip automation GmbH"
+			},
+			"licenses": [
+				{
+					"license": {
+						"id": "Apache-2.0"
+					}
+				}
+			],
+			"copyright": "© 2025 ekvip automation GmbH <info@ekvip.de>",
+			"scope": "required",
+			"externalReferences": [
+				{
+					"type": "vcs",
+					"url": "https://github.com/ekvipCinnamon/CNM_CycleManagerInterfaces",
+					"comment": "Source code repository"
+				}
+			]
+		},
+		{
+			"bom-ref": "CNM_ReturnTypes",
+			"type": "library",
+			"name": "CNM_ReturnTypes",
+			"version": "1.*",
+			"description": "",
+			"supplier": {
+				"name": "ekvip automation GmbH"
+			},
+			"licenses": [
+				{
+					"license": {
+						"id": "Apache-2.0"
+					}
+				}
+			],
+			"copyright": "© 2025 ekvip automation GmbH <info@ekvip.de>",
+			"scope": "required",
+			"externalReferences": [
+				{
+					"type": "vcs",
+					"url": "https://github.com/ekvipCinnamon/CNM_ReturnTypes",
+					"comment": "Source code repository"
+				}
+			]
+		},
+		{
+			"bom-ref": "Tc2_System",
+			"type": "library",
+			"name": "Tc2_System",
+			"version": "3.9.*",
+			"description": "",
+			"supplier": {
+				"name": "Beckhoff Automation GmbH"
+			}
+		}
+	],
+	"dependencies": [
+		{
+			"ref": "CNM_Collections",
+			"dependsOn": [
+				"CNM_AbstractObject",
+				"CNM_CollectionInterfaces",
+				"CNM_CommandInterfaces",
+				"CNM_CycleManager",
+				"CNM_CycleManagerInterfaces",
+				"CNM_ReturnTypes",
+				"Tc2_System"
+			]
+		}
+	],
+	"compositions": [
+		{
+			"aggregate": "complete",
+			"assemblies": [
+				"CNM_Collections"
+			],
+			"dependencies": [
+				"CNM_AbstractObject",
+				"CNM_CollectionInterfaces",
+				"CNM_CommandInterfaces",
+				"CNM_CycleManager",
+				"CNM_CycleManagerInterfaces",
+				"CNM_ReturnTypes",
+				"Tc2_System"
+			]
+		}
+	]
+}
